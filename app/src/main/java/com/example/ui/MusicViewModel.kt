@@ -61,6 +61,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentDuration = MutableStateFlow(0L)
     val currentDuration: StateFlow<Long> = _currentDuration
 
+    private val _dominantColor = MutableStateFlow<androidx.compose.ui.graphics.Color>(androidx.compose.ui.graphics.Color.Transparent)
+    val dominantColor: StateFlow<androidx.compose.ui.graphics.Color> = _dominantColor
+
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var mediaController: MediaController? = null
 
@@ -301,6 +304,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         } catch (e: Exception) {
             android.widget.Toast.makeText(getApplication(), "Failed to start download: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
         }
+    }
+
+    fun setDominantColor(color: androidx.compose.ui.graphics.Color) {
+        _dominantColor.value = color
     }
 
     override fun onCleared() {

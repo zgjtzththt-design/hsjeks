@@ -56,11 +56,15 @@ import androidx.compose.foundation.pager.rememberPagerState
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
+import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
+import androidx.palette.graphics.Palette
 import com.example.data.Song
 
 val SquircleShape = GenericShape { size, _ ->
@@ -628,7 +632,12 @@ fun PlaylistList(
 }
 
 @Composable
-fun AlbumArt(uri: String?, size: androidx.compose.ui.unit.Dp, shape: Shape = MaterialTheme.shapes.medium) {
+fun AlbumArt(
+    uri: String?, 
+    size: androidx.compose.ui.unit.Dp, 
+    shape: Shape = MaterialTheme.shapes.medium,
+    onBitmapLoaded: ((Bitmap) -> Unit)? = null
+) {
     Surface(
         modifier = Modifier
             .size(size)
@@ -642,7 +651,13 @@ fun AlbumArt(uri: String?, size: androidx.compose.ui.unit.Dp, shape: Shape = Mat
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
                 loading = { PlaceholderArt() },
-                error = { PlaceholderArt() }
+                error = { PlaceholderArt() },
+                onSuccess = { state ->
+                    val drawable = state.result.drawable
+                    if (drawable is BitmapDrawable && onBitmapLoaded != null) {
+                        onBitmapLoaded(drawable.bitmap)
+                    }
+                }
             )
         } else {
             PlaceholderArt()
@@ -660,33 +675,78 @@ fun PlayerScreen(
 ) {
     val progress by musicViewModel.playbackProgress.collectAsState()
     val duration by musicViewModel.currentDuration.collectAsState()
+    val rawDominantColor by musicViewModel.dominantColor.collectAsState()
+    
+    val dominantColor by animateColorAsState(
+        targetValue = if (rawDominantColor == Color.Transparent) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else rawDominantColor,
+        animationSpec = tween(1000),
+        label = "SmoothColor"
+    )
+
+    val infiniteTransition = rememberInfiniteTransition(label = "PulseTransition")
+    val animatedAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 0.6f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "ColorPulse"
+    )
 
     Surface(
         color = MaterialTheme.colorScheme.background,
         modifier = Modifier.fillMaxSize()
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Start
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Back", modifier = Modifier.size(32.dp))
-                }
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            AlbumArt(
-                uri = song.albumArtUri,
-                size = 300.dp,
-                shape = artShape
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Animated background glow at bottom
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(300.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                dominantColor.copy(alpha = animatedAlpha * 0.5f),
+                                dominantColor.copy(alpha = animatedAlpha)
+                            )
+                        )
+                    )
             )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Start
+                ) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Back", modifier = Modifier.size(32.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                AlbumArt(
+                    uri = song.albumArtUri,
+                    size = 300.dp,
+                    shape = artShape,
+                    onBitmapLoaded = { bitmap ->
+                        Palette.from(bitmap).generate { palette ->
+                            val color = palette?.dominantSwatch?.rgb?.let { Color(it) }
+                                ?: palette?.vibrantSwatch?.rgb?.let { Color(it) }
+                                ?: palette?.mutedSwatch?.rgb?.let { Color(it) }
+                            
+                            color?.let { musicViewModel.setDominantColor(it) }
+                        }
+                    }
+                )
 
             Spacer(modifier = Modifier.weight(1f))
 
@@ -851,6 +911,7 @@ fun PlayerScreen(
             Spacer(modifier = Modifier.weight(1f))
         }
     }
+}
 }
 
 private fun formatDuration(duration: Long): String {
@@ -1276,6 +1337,7 @@ fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(viewModel: ThemeViewModel) {
     val dynamicColor by viewModel.useDynamicColor.collectAsState()
