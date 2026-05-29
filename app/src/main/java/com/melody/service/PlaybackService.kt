@@ -16,6 +16,12 @@ class PlaybackService : MediaSessionService() {
         var loudnessEnhancer: android.media.audiofx.LoudnessEnhancer? = null
             private set
         
+        var currentTargetGain: Int = 0
+            set(value) {
+                field = value
+                loudnessEnhancer?.setTargetGain(value)
+            }
+        
         private val _amplitude = kotlinx.coroutines.flow.MutableStateFlow(0f)
         val amplitude: kotlinx.coroutines.flow.StateFlow<Float> = _amplitude
 
@@ -51,6 +57,7 @@ class PlaybackService : MediaSessionService() {
             loudnessEnhancer?.release()
             loudnessEnhancer = android.media.audiofx.LoudnessEnhancer(audioSessionId).apply {
                 enabled = true
+                setTargetGain(currentTargetGain)
             }
 
             visualizer?.release()

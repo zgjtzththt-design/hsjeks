@@ -165,9 +165,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         if (level > 100) {
             val boostPercent = level - 100
             val gainmB = boostPercent * 25
-            PlaybackService.loudnessEnhancer?.setTargetGain(gainmB)
+            PlaybackService.currentTargetGain = gainmB
         } else {
-            PlaybackService.loudnessEnhancer?.setTargetGain(0)
+            PlaybackService.currentTargetGain = 0
         }
         
         showVolumeBarForAWhile()
@@ -273,6 +273,16 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun playSong(song: Song, albumSongs: List<Song> = emptyList()) {
         mediaController?.let { controller ->
+            // If clicking the currently playing song, just pause/play
+            if (_currentSong.value?.id == song.id) {
+                if (controller.isPlaying) {
+                    controller.pause()
+                } else {
+                    controller.play()
+                }
+                return
+            }
+
             val contextSongs = if (albumSongs.isNotEmpty()) albumSongs else _songs.value
             val startIndex = contextSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
             

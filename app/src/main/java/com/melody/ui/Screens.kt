@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
@@ -242,6 +243,7 @@ fun MainScreen(
 
     val albumArtShape = remember(albumArtShapeIndex) { AlbumArtShapes.getOrElse(albumArtShapeIndex) { AlbumArtShapes[0] } }
     val playlists by musicViewModel.playlists.collectAsState(emptyList())
+    val bluetoothDevices by musicViewModel.bluetoothDevices.collectAsState()
 
     val filteredSongs = remember(songs, searchQuery) {
         if (searchQuery.isEmpty()) songs
@@ -395,6 +397,7 @@ fun MainScreen(
                             useCompact = useCompactLayout, 
                             artShape = albumArtShape, 
                             isGlassEnabled = isGlassEnabled,
+                            bluetoothDevices = bluetoothDevices,
                             onSongClick = { musicViewModel.playSong(it, filteredSongs) }
                         )
                         1 -> FolderList(songs = songs, useCompact = useCompactLayout)
@@ -450,10 +453,12 @@ fun SongList(
     useCompact: Boolean, 
     artShape: Shape, 
     isGlassEnabled: Boolean = false,
+    bluetoothDevices: List<MusicViewModel.BluetoothDeviceRecord> = emptyList(),
     onSongClick: (Song) -> Unit
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    var showEarbudsDialog by remember { mutableStateOf(false) }
     
     Column {
         Row(
@@ -488,6 +493,83 @@ fun SongList(
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                 )
+            )
+            
+            if (bluetoothDevices.isNotEmpty()) {
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(
+                    onClick = { showEarbudsDialog = true },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                ) {
+                    Icon(
+                        androidx.compose.material.icons.Icons.Rounded.Headphones, 
+                        contentDescription = "Earbuds",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+        
+        if (showEarbudsDialog) {
+            AlertDialog(
+                onDismissRequest = { showEarbudsDialog = false },
+                title = { Text("Bluetooth Devices") },
+                text = {
+                    Column {
+                        bluetoothDevices.forEach { device ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(androidx.compose.material.icons.Icons.Rounded.Headphones, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Column {
+                                        Text(device.name, fontWeight = FontWeight.Bold)
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        if (device.batteryLevel != null) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text("L", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                LinearProgressIndicator(
+                                                    progress = { device.batteryLevel / 100f },
+                                                    modifier = Modifier.weight(1f).height(6.dp),
+                                                    strokeCap = StrokeCap.Round
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text("${device.batteryLevel}%", style = MaterialTheme.typography.bodySmall)
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text("R", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                LinearProgressIndicator(
+                                                    progress = { device.batteryLevel / 100f },
+                                                    modifier = Modifier.weight(1f).height(6.dp),
+                                                    strokeCap = StrokeCap.Round
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text("${device.batteryLevel}%", style = MaterialTheme.typography.bodySmall)
+                                            }
+                                        } else {
+                                            Text("Battery: Unknown", style = MaterialTheme.typography.bodySmall)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showEarbudsDialog = false }) {
+                        Text("Close")
+                    }
+                }
             )
         }
         
@@ -1109,8 +1191,6 @@ fun PlayerScreen(
                 },
                 onValueChangeFinished = {
                     musicViewModel.seekTo((localSliderValue * duration).toLong())
-                    // We don't set sliderDragging back to false immediately to prevent jumping
-                    // The ViewModel progress update will eventually catch up
                 },
                 modifier = Modifier.testTag("playback_slider"),
                 colors = SliderDefaults.colors(
@@ -1124,7 +1204,7 @@ fun PlayerScreen(
             LaunchedEffect(progress) {
                 if (sliderDragging) {
                     val currentProgress = if (duration > 0) progress.toFloat() / duration.toFloat() else 0f
-                    if (abs(currentProgress - localSliderValue) < 0.03f) {
+                    if (abs(currentProgress - localSliderValue) < 0.05f) {
                         sliderDragging = false
                     }
                 }
