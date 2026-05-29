@@ -297,13 +297,6 @@ fun MainScreen(
             }
 
             val context = androidx.compose.ui.platform.LocalContext.current
-            val mediaRouter = remember { androidx.mediarouter.media.MediaRouter.getInstance(context) }
-            val selector = remember { 
-                androidx.mediarouter.media.MediaRouteSelector.Builder()
-                    .addControlCategory(androidx.mediarouter.media.MediaControlIntent.CATEGORY_LIVE_AUDIO)
-                    .addControlCategory(androidx.mediarouter.media.MediaControlIntent.CATEGORY_REMOTE_PLAYBACK)
-                    .build()
-            }
 
             Scaffold(
                 topBar = {
