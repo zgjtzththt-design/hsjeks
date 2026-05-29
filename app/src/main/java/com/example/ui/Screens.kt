@@ -1815,56 +1815,79 @@ fun ColorOption(color: androidx.compose.ui.graphics.Color, isSelected: Boolean, 
 
 @Composable
 fun CustomVolumeBar(volumeLevel: Int) {
+    val animatedProgress by animateFloatAsState(
+        targetValue = (volumeLevel / 300f).coerceIn(0f, 1f),
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "VolumeProgress"
+    )
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp),
-        shadowElevation = 8.dp,
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            .height(80.dp)
+            .padding(horizontal = 8.dp),
+        shadowElevation = 12.dp,
+        shape = RoundedCornerShape(40.dp),
+        color = MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = if (volumeLevel == 0) Icons.Default.VolumeOff else if (volumeLevel > 100) Icons.Default.VolumeUp else Icons.Default.VolumeDown,
-                contentDescription = null,
-                tint = if (volumeLevel > 100) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-            )
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Background track
             Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            )
+            
+            // Progress fill (Pixel Style Thick Slider)
+            val fillColor = if (volumeLevel > 100) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(animatedProgress)
+                    .background(fillColor)
+            )
+
+            // Content Overlay
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // The progress width handles 0-300
-                val progress = (volumeLevel / 300f).coerceIn(0f, 1f)
-                val color = if (volumeLevel > 100) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                val iconColor = if (animatedProgress > 0.1f) {
+                    if (volumeLevel > 100) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onPrimary
+                } else {
+                    MaterialTheme.colorScheme.primary
+                }
+
+                Icon(
+                    imageVector = when {
+                        volumeLevel == 0 -> Icons.Default.VolumeOff
+                        volumeLevel > 100 -> Icons.Default.VolumeUp
+                        else -> Icons.Default.VolumeDown
+                    },
+                    contentDescription = null,
+                    tint = iconColor,
+                    modifier = Modifier.size(28.dp)
+                )
                 
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(progress)
-                        .background(color)
+                Spacer(modifier = Modifier.width(16.dp))
+                
+                Text(
+                    text = if (volumeLevel > 100) "Extra Boost" else "Volume",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = iconColor,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                Text(
+                    text = "${volumeLevel}%",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = iconColor
                 )
             }
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            Text(
-                text = "${volumeLevel}%",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = if (volumeLevel > 100) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }
@@ -1887,6 +1910,13 @@ fun BluetoothBatterySheet(musicViewModel: MusicViewModel, onDismiss: () -> Unit)
             Text("Bluetooth Devices", 
                 style = MaterialTheme.typography.titleLarge, 
                 fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            
+            Text(
+                "Real-time connection & battery status",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
@@ -1899,46 +1929,71 @@ fun BluetoothBatterySheet(musicViewModel: MusicViewModel, onDismiss: () -> Unit)
                 }
             } else {
                 androidx.compose.foundation.lazy.LazyColumn(
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)
                 ) {
                     items(devices) { device ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Surface(
+                            onClick = { /* Clicking could potentially trigger connect, but usually system handles it */ },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (device.isConnected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else Color.Transparent,
+                            modifier = Modifier.padding(vertical = 4.dp)
                         ) {
-                            Box(
-                                contentAlignment = Alignment.Center, 
+                            Row(
                                 modifier = Modifier
-                                    .size(48.dp)
-                                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = if (device.name.lowercase().contains("headphones") || device.name.lowercase().contains("earbuds")) 
-                                        Icons.Default.Headset else Icons.Default.Bluetooth,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
-                            
-                            Spacer(modifier = Modifier.width(16.dp))
-                            
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(device.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                                Text(device.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-
-                            if (device.batteryLevel != null) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    contentAlignment = Alignment.Center, 
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .background(
+                                            if (device.isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, 
+                                            CircleShape
+                                        )
+                                ) {
                                     Icon(
-                                        imageVector = if (device.batteryLevel > 20) Icons.Default.BatteryFull else Icons.Default.BatteryAlert,
+                                        imageVector = if (device.name.lowercase().contains("headphones") || device.name.lowercase().contains("earbuds")) 
+                                            Icons.Default.Headset else Icons.Default.Bluetooth,
                                         contentDescription = null,
-                                        modifier = Modifier.size(16.dp),
-                                        tint = if (device.batteryLevel > 20) Color.Green else Color.Red
+                                        tint = if (device.isConnected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("${device.batteryLevel}%", style = MaterialTheme.typography.bodyMedium)
+                                }
+                                
+                                Spacer(modifier = Modifier.width(16.dp))
+                                
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        device.name, 
+                                        style = MaterialTheme.typography.bodyLarge, 
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (device.isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (device.isConnected) {
+                                            Text(
+                                                "Connected • ", 
+                                                style = MaterialTheme.typography.labelSmall, 
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        Text(device.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+
+                                if (device.batteryLevel != null) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = if (device.batteryLevel > 20) Icons.Default.BatteryFull else Icons.Default.BatteryAlert,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = if (device.batteryLevel > 20) Color.Green else Color.Red
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("${device.batteryLevel}%", style = MaterialTheme.typography.bodyMedium)
+                                    }
                                 }
                             }
                         }
@@ -1946,12 +2001,33 @@ fun BluetoothBatterySheet(musicViewModel: MusicViewModel, onDismiss: () -> Unit)
                 }
             }
             
-            Button(
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-                shape = RoundedCornerShape(16.dp)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            val context = androidx.compose.ui.platform.LocalContext.current
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("Close")
+                OutlinedButton(
+                    onClick = {
+                        val intent = android.content.Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS)
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Pair New")
+                }
+
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Close")
+                }
             }
         }
     }

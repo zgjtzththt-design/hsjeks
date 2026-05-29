@@ -87,12 +87,34 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var mediaController: MediaController? = null
 
+    private val bluetoothReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: android.content.Intent?) {
+            when (intent?.action) {
+                android.bluetooth.BluetoothDevice.ACTION_ACL_CONNECTED,
+                android.bluetooth.BluetoothDevice.ACTION_ACL_DISCONNECTED,
+                android.bluetooth.BluetoothDevice.ACTION_BOND_STATE_CHANGED,
+                "android.bluetooth.device.action.BATTERY_LEVEL_CHANGED" -> {
+                    updateBluetoothDevices()
+                }
+            }
+        }
+    }
+
     init {
         val currentSysVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
         _volumeLevel.value = ((currentSysVol.toFloat() / maxSysVolume) * 100).toInt()
         loadSongs()
         setupMediaController()
         startProgressUpdate()
+        
+        val filter = android.content.IntentFilter().apply {
+            addAction(android.bluetooth.BluetoothDevice.ACTION_ACL_CONNECTED)
+            addAction(android.bluetooth.BluetoothDevice.ACTION_ACL_DISCONNECTED)
+            addAction(android.bluetooth.BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+            addAction("android.bluetooth.device.action.BATTERY_LEVEL_CHANGED")
+        }
+        getApplication<Application>().registerReceiver(bluetoothReceiver, filter)
+        
         updateBluetoothDevices()
     }
     
@@ -111,11 +133,19 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         if (level in 0..100) battery = level
                     } catch (e: Exception) {}
 
+                    // Check if connected using hidden method or by checking A2DP profile
+                    // For simplicity in a prototype/build, we'll use a reflection check for isConnected
+                    var isConnected = false
+                    try {
+                        val isConnectedMethod = device.javaClass.getMethod("isConnected")
+                        isConnected = isConnectedMethod.invoke(device) as Boolean
+                    } catch (e: Exception) {}
+
                     BluetoothDeviceRecord(
                         name = device.name ?: "Unknown Device",
                         address = device.address,
                         batteryLevel = battery,
-                        isConnected = false 
+                        isConnected = isConnected
                     )
                 }
                 _bluetoothDevices.value = devices
@@ -405,5 +435,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     override fun onCleared() {
         super.onCleared()
         controllerFuture?.let { MediaController.releaseFuture(it) }
+        try {
+            getApplication<Application>().unregisterReceiver(bluetoothReceiver)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }
