@@ -56,6 +56,8 @@ class MainActivity : ComponentActivity() {
             add(Manifest.permission.READ_EXTERNAL_STORAGE)
           }
           
+          add(Manifest.permission.RECORD_AUDIO)
+          
           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             add(Manifest.permission.BLUETOOTH_SCAN)
             add(Manifest.permission.BLUETOOTH_CONNECT)

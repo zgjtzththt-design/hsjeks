@@ -73,6 +73,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _dominantColor = MutableStateFlow<androidx.compose.ui.graphics.Color>(androidx.compose.ui.graphics.Color.Transparent)
     val dominantColor: StateFlow<androidx.compose.ui.graphics.Color> = _dominantColor
+    
+    val audioAmplitude: StateFlow<Float> = PlaybackService.amplitude
 
     data class BluetoothDeviceRecord(
         val name: String,

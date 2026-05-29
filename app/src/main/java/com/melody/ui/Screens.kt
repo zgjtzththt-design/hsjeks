@@ -251,88 +251,79 @@ fun MainScreen(
         }
     }
 
-    var showOnlineSearch by remember { mutableStateOf(false) }
-    var showPlayer by remember { mutableStateOf(false) }
-    
-    if (showOnlineSearch) {
-        OnlineSearchDialog(
-            musicViewModel = musicViewModel,
-            onDismiss = { showOnlineSearch = false }
-        )
-    }
-
-    val pagerState = rememberPagerState(pageCount = { 4 })
-    val coroutineScope = rememberCoroutineScope()
-
-    val showVolumeBar by musicViewModel.showVolumeBar.collectAsState()
-    val volumeLevel by musicViewModel.volumeLevel.collectAsState()
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        AnimatedContent(
-            targetState = showPlayer && currentSong != null,
-            transitionSpec = {
-                if (targetState) {
-                    (slideInVertically { height -> height } + fadeIn()).togetherWith(
-                        slideOutVertically { height -> -height } + fadeOut())
-                } else {
-                    (slideInVertically { height -> -height } + fadeIn()).togetherWith(
-                        slideOutVertically { height -> height } + fadeOut())
-                }.using(SizeTransform(clip = false))
-            },
-            label = "PlayerTransition"
-        ) { isPlayerVisible ->
-        if (isPlayerVisible && currentSong != null) {
-            PlayerScreen(
-                musicViewModel = musicViewModel,
-                song = currentSong!!,
-                isPlaying = isPlaying,
-                artShape = albumArtShape,
-                onDismiss = { showPlayer = false }
-            )
-        } else {
-            var showBluetoothDialog by remember { mutableStateOf(false) }
-
-            if (showBluetoothDialog) {
-                BluetoothBatterySheet(musicViewModel = musicViewModel, onDismiss = { showBluetoothDialog = false })
+            var showOnlineSearch by remember { mutableStateOf(false) }
+            var showPlayer by remember { mutableStateOf(false) }
+            var showCastSheet by remember { mutableStateOf(false) }
+            
+            if (showOnlineSearch) {
+                OnlineSearchDialog(
+                    musicViewModel = musicViewModel,
+                    onDismiss = { showOnlineSearch = false }
+                )
             }
 
-            val context = androidx.compose.ui.platform.LocalContext.current
-            val mediaRouter = remember { androidx.mediarouter.media.MediaRouter.getInstance(context) }
-            val selector = remember { 
-                androidx.mediarouter.media.MediaRouteSelector.Builder()
-                    .addControlCategory(androidx.mediarouter.media.MediaControlIntent.CATEGORY_LIVE_AUDIO)
-                    .addControlCategory(androidx.mediarouter.media.MediaControlIntent.CATEGORY_REMOTE_PLAYBACK)
-                    .build()
+            if (showCastSheet) {
+                CastBottomSheet(onDismiss = { showCastSheet = false })
             }
 
-            Scaffold(
-                topBar = {
-                    @OptIn(ExperimentalMaterial3Api::class)
-                    TopAppBar(
-                        title = { Text(text = "Melody", fontWeight = FontWeight.Bold) },
-                        actions = {
-                            IconButton(onClick = { 
-                                val activity = context as? android.app.Activity
-                                if (activity != null) {
-                                    // Use system cast chooser via Settings if possible
-                                    val intent = android.content.Intent(android.provider.Settings.ACTION_CAST_SETTINGS)
-                                    context.startActivity(intent)
-                                }
-                            }) {
-                                Icon(Icons.Default.Cast, contentDescription = "Cast")
-                            }
-                            IconButton(onClick = { 
-                                musicViewModel.updateBluetoothDevices()
-                                showBluetoothDialog = true 
-                            }) {
-                                Icon(Icons.Default.Bluetooth, contentDescription = "Bluetooth Devices")
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = Color.Transparent
-                        )
+            val pagerState = rememberPagerState(pageCount = { 4 })
+            val coroutineScope = rememberCoroutineScope()
+
+            val showVolumeBar by musicViewModel.showVolumeBar.collectAsState()
+            val volumeLevel by musicViewModel.volumeLevel.collectAsState()
+
+            Box(modifier = Modifier.fillMaxSize()) {
+                AnimatedContent(
+                    targetState = showPlayer && currentSong != null,
+                    transitionSpec = {
+                        if (targetState) {
+                            (slideInVertically { height -> height } + fadeIn()).togetherWith(
+                                slideOutVertically { height -> -height } + fadeOut())
+                        } else {
+                            (slideInVertically { height -> -height } + fadeIn()).togetherWith(
+                                slideOutVertically { height -> height } + fadeOut())
+                        }.using(SizeTransform(clip = false))
+                    },
+                    label = "PlayerTransition"
+                ) { isPlayerVisible ->
+                if (isPlayerVisible && currentSong != null) {
+                    PlayerScreen(
+                        musicViewModel = musicViewModel,
+                        song = currentSong!!,
+                        isPlaying = isPlaying,
+                        artShape = albumArtShape,
+                        onDismiss = { showPlayer = false }
                     )
-                },
+                } else {
+                    var showBluetoothDialog by remember { mutableStateOf(false) }
+
+                    if (showBluetoothDialog) {
+                        BluetoothBatterySheet(musicViewModel = musicViewModel, onDismiss = { showBluetoothDialog = false })
+                    }
+
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    
+                    Scaffold(
+                        topBar = {
+                            @OptIn(ExperimentalMaterial3Api::class)
+                            TopAppBar(
+                                title = { Text(text = "Melody", fontWeight = FontWeight.Bold) },
+                                actions = {
+                                    IconButton(onClick = { showCastSheet = true }) {
+                                        Icon(Icons.Default.Cast, contentDescription = "Cast")
+                                    }
+                                    IconButton(onClick = { 
+                                        musicViewModel.updateBluetoothDevices()
+                                        showBluetoothDialog = true 
+                                    }) {
+                                        Icon(Icons.Default.Bluetooth, contentDescription = "Bluetooth Devices")
+                                    }
+                                },
+                                colors = TopAppBarDefaults.topAppBarColors(
+                                    containerColor = Color.Transparent
+                                )
+                            )
+                        },
                 bottomBar = {
                     Column {
                         if (currentSong != null) {
@@ -800,6 +791,146 @@ fun AlbumArt(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CastBottomSheet(
+    onDismiss: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val mediaRouter = remember { androidx.mediarouter.media.MediaRouter.getInstance(context) }
+    val selector = remember { 
+        androidx.mediarouter.media.MediaRouteSelector.Builder()
+            .addControlCategory(androidx.mediarouter.media.MediaControlIntent.CATEGORY_LIVE_AUDIO)
+            .addControlCategory(androidx.mediarouter.media.MediaControlIntent.CATEGORY_REMOTE_PLAYBACK)
+            .build()
+    }
+    
+    var routes by remember { mutableStateOf(emptyList<androidx.mediarouter.media.MediaRouter.RouteInfo>()) }
+    
+    DisposableEffect(Unit) {
+        val callback = object : androidx.mediarouter.media.MediaRouter.Callback() {
+            override fun onRouteAdded(router: androidx.mediarouter.media.MediaRouter?, route: androidx.mediarouter.media.MediaRouter.RouteInfo?) {
+                routes = mediaRouter.routes.filter { it.isEnabled && it.matchesSelector(selector) }
+            }
+            override fun onRouteRemoved(router: androidx.mediarouter.media.MediaRouter?, route: androidx.mediarouter.media.MediaRouter.RouteInfo?) {
+                routes = mediaRouter.routes.filter { it.isEnabled && it.matchesSelector(selector) }
+            }
+            override fun onRouteChanged(router: androidx.mediarouter.media.MediaRouter?, route: androidx.mediarouter.media.MediaRouter.RouteInfo?) {
+                routes = mediaRouter.routes.filter { it.isEnabled && it.matchesSelector(selector) }
+            }
+        }
+        
+        mediaRouter.addCallback(selector, callback, androidx.mediarouter.media.MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY)
+        routes = mediaRouter.routes.filter { it.isEnabled && it.matchesSelector(selector) }
+        
+        onDispose {
+            mediaRouter.removeCallback(callback)
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .padding(bottom = 32.dp)
+        ) {
+            Text(
+                "Cast to Device",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+            
+            if (routes.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(100.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    Text("Searching for TVs and devices...", modifier = Modifier.padding(top = 48.dp))
+                }
+            } else {
+                routes.forEach { route ->
+                    ListItem(
+                        headlineContent = { Text(route.name) },
+                        supportingContent = { Text(route.description ?: "Ready to cast") },
+                        leadingContent = {
+                            Icon(
+                                when {
+                                    route.deviceType == androidx.mediarouter.media.MediaRouter.RouteInfo.DEVICE_TYPE_TV -> Icons.Default.Tv
+                                    route.deviceType == androidx.mediarouter.media.MediaRouter.RouteInfo.DEVICE_TYPE_SPEAKER -> Icons.Default.Speaker
+                                    else -> Icons.Default.Cast
+                                },
+                                contentDescription = null
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                route.select()
+                                onDismiss()
+                            }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun RainEffect(
+    modifier: Modifier = Modifier,
+    isPlaying: Boolean,
+    amplitude: Float = 0f
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "RainTransition")
+    val rainPhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "RainPhase"
+    )
+
+    val raindrops = remember { 
+        List(100) { 
+            object {
+                val x = (0..1000).random() / 1000f
+                val size = (5..15).random().toFloat()
+                val speed = (10..30).random().toFloat()
+            }
+        }
+    }
+
+    Canvas(modifier = modifier.fillMaxSize()) {
+        if (isPlaying) {
+            val h = size.height
+            val w = size.width
+            val baseSpeed = 1000f // pixels per second
+            val rhythmicSpeedFactor = 1f + (amplitude * 2f)
+
+            raindrops.forEach { drop ->
+                val startX = drop.x * w
+                val currentY = ((rainPhase * drop.speed * rhythmicSpeedFactor * 100) % h)
+                
+                drawLine(
+                    color = Color.White.copy(alpha = 0.3f),
+                    start = Offset(startX, currentY),
+                    end = Offset(startX, currentY + drop.size + (amplitude * 20f)),
+                    strokeWidth = 2.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+            }
+        }
+    }
+}
+
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(
@@ -812,15 +943,30 @@ fun PlayerScreen(
     val progress by musicViewModel.playbackProgress.collectAsState()
     val duration by musicViewModel.currentDuration.collectAsState()
     val rawDominantColor by musicViewModel.dominantColor.collectAsState()
+    val audioAmplitude by musicViewModel.audioAmplitude.collectAsState()
     
     var showAlbumMenu by remember { mutableStateOf(false) }
     var enableRain by remember { mutableStateOf(false) }
     var enableBeatBounce by remember { mutableStateOf(false) }
+    var enableRhythmicFolder by remember { mutableStateOf(false) }
     
     val dominantColor by animateColorAsState(
         targetValue = if (rawDominantColor == Color.Transparent) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else rawDominantColor,
         animationSpec = tween(1200),
         label = "SmoothColor"
+    )
+
+    // Rhythmic Folder Offset
+    val folderOffset by animateDpAsState(
+        targetValue = if (enableRhythmicFolder && isPlaying) (audioAmplitude * 100).dp else 0.dp,
+        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow),
+        label = "FolderMovement"
+    )
+
+    val folderRotation by animateFloatAsState(
+        targetValue = if (enableRhythmicFolder && isPlaying) audioAmplitude * 45f else 0f,
+        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow),
+        label = "FolderRotation"
     )
 
     // 3D Flip animation when song changes
@@ -863,6 +1009,8 @@ fun PlayerScreen(
         ),
         label = "BeatPulse"
     )
+
+    val rhythmScale = if (enableBeatBounce && isPlaying) (1f + audioAmplitude * 0.2f) else 1f
 
     val infiniteTransition = rememberInfiniteTransition(label = "PulseTransition")
     val animatedAlpha by infiniteTransition.animateFloat(
@@ -915,10 +1063,11 @@ fun PlayerScreen(
 
                 Box(
                     modifier = Modifier.graphicsLayer {
-                        val activeBeatScale = if (enableBeatBounce && isPlaying) beatScale else 1f
+                        val activeBeatScale = if (enableBeatBounce && isPlaying) rhythmScale else 1f
                         scaleX = albumScale * animatedPopScale * activeBeatScale
                         scaleY = albumScale * animatedPopScale * activeBeatScale
-                        rotationY = animatedFlip
+                        rotationY = animatedFlip + folderRotation
+                        translationY = folderOffset.toPx()
                         cameraDistance = 8 * density
                     }
                     .pointerInput(Unit) {
@@ -930,7 +1079,7 @@ fun PlayerScreen(
                     AlbumArt(
                         uri = song.albumArtUri,
                         size = 320.dp,
-                        shape = artShape,
+                        shape = if (enableRhythmicFolder) FolderShapes[1] else artShape,
                         onBitmapLoaded = { bitmap ->
                             Palette.from(bitmap).generate { palette ->
                                 val color = palette?.vibrantSwatch?.rgb?.let { Color(it) }
@@ -943,7 +1092,11 @@ fun PlayerScreen(
                     )
                     
                     if (enableRain) {
-                        AnimatedRainEffect(modifier = Modifier.matchParentSize())
+                        RainEffect(
+                            modifier = Modifier.matchParentSize(),
+                            isPlaying = isPlaying,
+                            amplitude = audioAmplitude
+                        )
                     }
                 }
 
@@ -954,7 +1107,7 @@ fun PlayerScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp).padding(bottom = 24.dp)) {
                         Text(
-                            text = "Album Options",
+                            text = "Visual Effects",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(bottom = 16.dp)
@@ -978,8 +1131,19 @@ fun PlayerScreen(
                                 .padding(vertical = 12.dp)
                         ) {
                             Icon(Icons.Outlined.Animation, contentDescription = null, modifier = Modifier.padding(end = 16.dp))
-                            Text("Beat Bounce", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                            Text("Beat Pulse (Visualizer)", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                             Switch(checked = enableBeatBounce, onCheckedChange = { enableBeatBounce = it })
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { enableRhythmicFolder = !enableRhythmicFolder }
+                                .padding(vertical = 12.dp)
+                        ) {
+                            Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.padding(end = 16.dp))
+                            Text("Rhythmic Folder Motion", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                            Switch(checked = enableRhythmicFolder, onCheckedChange = { enableRhythmicFolder = it })
                         }
                     }
                 }

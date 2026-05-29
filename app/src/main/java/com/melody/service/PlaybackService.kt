@@ -14,6 +14,11 @@ class PlaybackService : MediaSessionService() {
     companion object {
         var loudnessEnhancer: android.media.audiofx.LoudnessEnhancer? = null
             private set
+        
+        private val _amplitude = kotlinx.coroutines.flow.MutableStateFlow(0f)
+        val amplitude: kotlinx.coroutines.flow.StateFlow<Float> = _amplitude
+
+        private var visualizer: android.media.audiofx.Visualizer? = null
     }
 
     @OptIn(UnstableApi::class)
@@ -32,19 +37,43 @@ class PlaybackService : MediaSessionService() {
         player.addListener(object : androidx.media3.common.Player.Listener {
             override fun onAudioSessionIdChanged(audioSessionId: Int) {
                 if (audioSessionId != C.AUDIO_SESSION_ID_UNSET) {
-                    try {
-                        loudnessEnhancer?.release()
-                        loudnessEnhancer = android.media.audiofx.LoudnessEnhancer(audioSessionId).apply {
-                            enabled = true
-                        }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
+                    setupAudioEffects(audioSessionId)
                 }
             }
         })
 
         mediaSession = MediaSession.Builder(this, player).build()
+    }
+
+    private fun setupAudioEffects(audioSessionId: Int) {
+        try {
+            loudnessEnhancer?.release()
+            loudnessEnhancer = android.media.audiofx.LoudnessEnhancer(audioSessionId).apply {
+                enabled = true
+            }
+
+            visualizer?.release()
+            visualizer = android.media.audiofx.Visualizer(audioSessionId).apply {
+                captureSize = android.media.audiofx.Visualizer.getCaptureSizeRange()[1]
+                setDataCaptureListener(object : android.media.audiofx.Visualizer.OnDataCaptureListener {
+                    override fun onWaveFormDataCapture(v: android.media.audiofx.Visualizer?, waveform: ByteArray?, samplingRate: Int) {
+                        if (waveform != null && waveform.isNotEmpty()) {
+                            var sum = 0f
+                            for (i in 0 until waveform.size) {
+                                val amplitude = (waveform[i].toInt() and 0xFF) - 128
+                                sum += Math.abs(amplitude).toFloat()
+                            }
+                            _amplitude.value = (sum / waveform.size) / 128f
+                        }
+                    }
+
+                    override fun onFftDataCapture(v: android.media.audiofx.Visualizer?, fft: ByteArray?, samplingRate: Int) {}
+                }, android.media.audiofx.Visualizer.getMaxCaptureRate() / 2, true, false)
+                enabled = true
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
@@ -55,6 +84,10 @@ class PlaybackService : MediaSessionService() {
             release()
             mediaSession = null
         }
+        visualizer?.release()
+        visualizer = null
+        loudnessEnhancer?.release()
+        loudnessEnhancer = null
         super.onDestroy()
     }
 }
