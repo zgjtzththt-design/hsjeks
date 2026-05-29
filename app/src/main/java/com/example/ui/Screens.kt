@@ -684,15 +684,27 @@ fun PlayerScreen(
         label = "SmoothColor"
     )
 
-    // Rotation animation when song changes
-    var rotationAngle by remember { mutableFloatStateOf(0f) }
+    // 3D Flip animation when song changes
+    var flipAngle by remember { mutableFloatStateOf(0f) }
+    var songPopScale by remember { mutableFloatStateOf(1f) }
+    
     LaunchedEffect(song.id) {
-        rotationAngle += 360f
+        flipAngle += 180f
+        songPopScale = 1.15f
+        kotlinx.coroutines.delay(200)
+        songPopScale = 1f
     }
-    val animatedRotation by animateFloatAsState(
-        targetValue = rotationAngle,
+    
+    val animatedFlip by animateFloatAsState(
+        targetValue = flipAngle,
         animationSpec = spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow),
-        label = "AlbumRotation"
+        label = "AlbumFlip"
+    )
+    
+    val animatedPopScale by animateFloatAsState(
+        targetValue = songPopScale,
+        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow),
+        label = "SongPop"
     )
 
     // Scale animation based on playback state
@@ -753,9 +765,10 @@ fun PlayerScreen(
 
                 Box(
                     modifier = Modifier.graphicsLayer {
-                        scaleX = albumScale
-                        scaleY = albumScale
-                        rotationZ = animatedRotation
+                        scaleX = albumScale * animatedPopScale
+                        scaleY = albumScale * animatedPopScale
+                        rotationY = animatedFlip
+                        cameraDistance = 8 * density
                     }
                 ) {
                     AlbumArt(
