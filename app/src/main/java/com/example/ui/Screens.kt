@@ -1815,79 +1815,61 @@ fun ColorOption(color: androidx.compose.ui.graphics.Color, isSelected: Boolean, 
 
 @Composable
 fun CustomVolumeBar(volumeLevel: Int) {
-    val animatedProgress by animateFloatAsState(
-        targetValue = (volumeLevel / 300f).coerceIn(0f, 1f),
-        animationSpec = spring(stiffness = Spring.StiffnessLow),
-        label = "VolumeProgress"
-    )
-
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(80.dp)
-            .padding(horizontal = 8.dp),
-        shadowElevation = 12.dp,
-        shape = RoundedCornerShape(40.dp),
-        color = MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp),
+            .height(54.dp)
+            .padding(horizontal = 4.dp),
+        shadowElevation = 4.dp,
+        shape = RoundedCornerShape(27.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            // Background track
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = when {
+                    volumeLevel == 0 -> Icons.Default.VolumeOff
+                    volumeLevel > 100 -> Icons.Default.VolumeUp
+                    else -> Icons.Default.VolumeDown
+                },
+                contentDescription = null,
+                tint = if (volumeLevel > 100) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
             )
             
-            // Progress fill (Pixel Style Thick Slider)
-            val fillColor = if (volumeLevel > 100) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+            Spacer(modifier = Modifier.width(12.dp))
+            
             Box(
                 modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(animatedProgress)
-                    .background(fillColor)
-            )
-
-            // Content Overlay
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 24.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .weight(1f)
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f))
             ) {
-                val iconColor = if (animatedProgress > 0.1f) {
-                    if (volumeLevel > 100) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onPrimary
-                } else {
-                    MaterialTheme.colorScheme.primary
-                }
-
-                Icon(
-                    imageVector = when {
-                        volumeLevel == 0 -> Icons.Default.VolumeOff
-                        volumeLevel > 100 -> Icons.Default.VolumeUp
-                        else -> Icons.Default.VolumeDown
-                    },
-                    contentDescription = null,
-                    tint = iconColor,
-                    modifier = Modifier.size(28.dp)
-                )
+                val progress = (volumeLevel / 300f).coerceIn(0f, 1f)
+                val color = if (volumeLevel > 100) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                 
-                Spacer(modifier = Modifier.width(16.dp))
-                
-                Text(
-                    text = if (volumeLevel > 100) "Extra Boost" else "Volume",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = iconColor,
-                    modifier = Modifier.weight(1f)
-                )
-                
-                Text(
-                    text = "${volumeLevel}%",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = iconColor
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(progress)
+                        .background(color)
                 )
             }
+            
+            Spacer(modifier = Modifier.width(12.dp))
+            
+            Text(
+                text = "${volumeLevel}%",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = if (volumeLevel > 100) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
