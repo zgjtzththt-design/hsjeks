@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.melody">
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -26,9 +25,9 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MyApplication"
-        android:name=".MelodyApp">
+        android:name="com.melody.MelodyApp">
         <service
-            android:name=".service.PlaybackService"
+            android:name="com.melody.service.PlaybackService"
             android:enabled="true"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">
@@ -37,7 +36,7 @@
             </intent-filter>
         </service>
         <activity
-            android:name=".MainActivity"
+            android:name="com.melody.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.MyApplication">

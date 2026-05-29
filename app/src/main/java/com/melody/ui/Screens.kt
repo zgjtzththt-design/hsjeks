@@ -251,17 +251,9 @@ fun MainScreen(
         }
     }
 
-            var showOnlineSearch by remember { mutableStateOf(false) }
             var showPlayer by remember { mutableStateOf(false) }
             var showCastSheet by remember { mutableStateOf(false) }
             
-            if (showOnlineSearch) {
-                OnlineSearchDialog(
-                    musicViewModel = musicViewModel,
-                    onDismiss = { showOnlineSearch = false }
-                )
-            }
-
             if (showCastSheet) {
                 CastBottomSheet(onDismiss = { showCastSheet = false })
             }
@@ -403,7 +395,6 @@ fun MainScreen(
                             useCompact = useCompactLayout, 
                             artShape = albumArtShape, 
                             isGlassEnabled = isGlassEnabled,
-                            onOnlineSearchClick = { showOnlineSearch = true },
                             onSongClick = { musicViewModel.playSong(it, filteredSongs) }
                         )
                         1 -> FolderList(songs = songs, useCompact = useCompactLayout)
@@ -459,7 +450,6 @@ fun SongList(
     useCompact: Boolean, 
     artShape: Shape, 
     isGlassEnabled: Boolean = false,
-    onOnlineSearchClick: () -> Unit,
     onSongClick: (Song) -> Unit
 ) {
     val listState = rememberLazyListState()
@@ -499,20 +489,6 @@ fun SongList(
                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             )
-            
-            Spacer(modifier = Modifier.width(8.dp))
-            
-            FilledIconButton(
-                onClick = onOnlineSearchClick,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.size(52.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            ) {
-                Icon(Icons.Default.Language, contentDescription = "Online Search")
-            }
         }
         
         Box(modifier = Modifier.fillMaxSize()) {
@@ -809,13 +785,13 @@ fun CastBottomSheet(
     
     DisposableEffect(Unit) {
         val callback = object : androidx.mediarouter.media.MediaRouter.Callback() {
-            override fun onRouteAdded(router: androidx.mediarouter.media.MediaRouter?, route: androidx.mediarouter.media.MediaRouter.RouteInfo?) {
+            override fun onRouteAdded(router: androidx.mediarouter.media.MediaRouter, route: androidx.mediarouter.media.MediaRouter.RouteInfo) {
                 routes = mediaRouter.routes.filter { it.isEnabled && it.matchesSelector(selector) }
             }
-            override fun onRouteRemoved(router: androidx.mediarouter.media.MediaRouter?, route: androidx.mediarouter.media.MediaRouter.RouteInfo?) {
+            override fun onRouteRemoved(router: androidx.mediarouter.media.MediaRouter, route: androidx.mediarouter.media.MediaRouter.RouteInfo) {
                 routes = mediaRouter.routes.filter { it.isEnabled && it.matchesSelector(selector) }
             }
-            override fun onRouteChanged(router: androidx.mediarouter.media.MediaRouter?, route: androidx.mediarouter.media.MediaRouter.RouteInfo?) {
+            override fun onRouteChanged(router: androidx.mediarouter.media.MediaRouter, route: androidx.mediarouter.media.MediaRouter.RouteInfo) {
                 routes = mediaRouter.routes.filter { it.isEnabled && it.matchesSelector(selector) }
             }
         }
@@ -876,56 +852,6 @@ fun CastBottomSheet(
                             }
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun RainEffect(
-    modifier: Modifier = Modifier,
-    isPlaying: Boolean,
-    amplitude: Float = 0f
-) {
-    val infiniteTransition = rememberInfiniteTransition(label = "RainTransition")
-    val rainPhase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "RainPhase"
-    )
-
-    val raindrops = remember { 
-        List(100) { 
-            object {
-                val x = (0..1000).random() / 1000f
-                val size = (5..15).random().toFloat()
-                val speed = (10..30).random().toFloat()
-            }
-        }
-    }
-
-    Canvas(modifier = modifier.fillMaxSize()) {
-        if (isPlaying) {
-            val h = size.height
-            val w = size.width
-            val baseSpeed = 1000f // pixels per second
-            val rhythmicSpeedFactor = 1f + (amplitude * 2f)
-
-            raindrops.forEach { drop ->
-                val startX = drop.x * w
-                val currentY = ((rainPhase * drop.speed * rhythmicSpeedFactor * 100) % h)
-                
-                drawLine(
-                    color = Color.White.copy(alpha = 0.3f),
-                    start = Offset(startX, currentY),
-                    end = Offset(startX, currentY + drop.size + (amplitude * 20f)),
-                    strokeWidth = 2.dp.toPx(),
-                    cap = StrokeCap.Round
-                )
             }
         }
     }
@@ -1092,11 +1018,7 @@ fun PlayerScreen(
                     )
                     
                     if (enableRain) {
-                        RainEffect(
-                            modifier = Modifier.matchParentSize(),
-                            isPlaying = isPlaying,
-                            amplitude = audioAmplitude
-                        )
+                        AnimatedRainEffect(modifier = Modifier.matchParentSize())
                     }
                 }
 
@@ -1395,132 +1317,6 @@ private fun formatDuration(duration: Long): String {
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return String.format("%02d:%02d", minutes, seconds)
-}
-
-@Composable
-fun OnlineSearchDialog(
-    musicViewModel: MusicViewModel,
-    onDismiss: () -> Unit
-) {
-    var query by remember { mutableStateOf("") }
-    val results by musicViewModel.onlineSearchResults.collectAsState()
-    val isSearching by musicViewModel.isSearchingOnline.collectAsState()
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Global Discovery", style = MaterialTheme.typography.titleLarge)
-                    if (isSearching) {
-                        Text("Connecting to servers...", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-                if (isSearching) {
-                    HyperLoadingIndicator(modifier = Modifier.size(width = 32.dp, height = 4.dp))
-                }
-            }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                TextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    placeholder = { Text("Search by song name...") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    trailingIcon = {
-                        if (query.isNotBlank()) {
-                            IconButton(onClick = { musicViewModel.performMusicSearch(query) }) {
-                                Icon(Icons.Default.Send, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { musicViewModel.performMusicSearch(query) }),
-                    colors = TextFieldDefaults.colors(
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                )
-                
-                if (isSearching) {
-                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
-                        HyperLoadingIndicator()
-                    }
-                } else if (results.isNotEmpty()) {
-                    Text("Internet Search Results:", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                    
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.heightIn(max = 300.dp)
-                    ) {
-                        items(results) { result ->
-                            Card(
-                                onClick = { musicViewModel.downloadSong(result.downloadUrl, result.title) },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Surface(
-                                        modifier = Modifier.size(40.dp),
-                                        shape = CircleShape,
-                                        color = MaterialTheme.colorScheme.primaryContainer
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(20.dp))
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(result.title, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text("${result.source} • MP3", style = MaterialTheme.typography.labelSmall)
-                                    }
-                                    Icon(Icons.Default.Download, contentDescription = "Download", tint = MaterialTheme.colorScheme.primary)
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                Icons.Default.Language, 
-                                contentDescription = null, 
-                                modifier = Modifier.size(48.dp).graphicsLayer { alpha = 0.3f }
-                             )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("Fast Search All Music Sources", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Close")
-            }
-        }
-    )
 }
 
 @Composable

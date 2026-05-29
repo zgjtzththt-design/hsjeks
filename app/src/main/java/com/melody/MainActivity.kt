@@ -1,5 +1,6 @@
 package com.melody
 
+// Forced recompile
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
@@ -56,8 +57,6 @@ class MainActivity : ComponentActivity() {
             add(Manifest.permission.READ_EXTERNAL_STORAGE)
           }
           
-          add(Manifest.permission.RECORD_AUDIO)
-          
           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             add(Manifest.permission.BLUETOOTH_SCAN)
             add(Manifest.permission.BLUETOOTH_CONNECT)
@@ -77,11 +76,30 @@ class MainActivity : ComponentActivity() {
         }
 
         if (hasPermission) {
-          MainScreen(
-            musicViewModel = musicViewModel,
-            themeViewModel = themeViewModel,
-            onNavigateToSettings = { /* Already handled by selectedTab in MainScreen */ }
-          )
+          var hasSeenWelcome by remember { 
+              mutableStateOf(
+                  getSharedPreferences("melody_prefs", android.content.Context.MODE_PRIVATE)
+                      .getBoolean("has_seen_welcome", false)
+              ) 
+          }
+
+          if (hasSeenWelcome) {
+            MainScreen(
+              musicViewModel = musicViewModel,
+              themeViewModel = themeViewModel,
+              onNavigateToSettings = { /* Already handled by selectedTab in MainScreen */ }
+            )
+          } else {
+            WelcomeScreen(
+                onFinishOnboarding = {
+                    getSharedPreferences("melody_prefs", android.content.Context.MODE_PRIVATE)
+                        .edit()
+                        .putBoolean("has_seen_welcome", true)
+                        .apply()
+                    hasSeenWelcome = true
+                }
+            )
+          }
         } else {
             // Simple placeholder for permission denied or not yet asked
         }

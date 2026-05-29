@@ -1,5 +1,6 @@
 package com.melody.service
 
+// Forced recompile
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -53,32 +54,23 @@ class PlaybackService : MediaSessionService() {
             }
 
             visualizer?.release()
-            
-            // Check for RECORD_AUDIO permission before enabling Visualizer
-            val hasRecordPermission = androidx.core.content.ContextCompat.checkSelfPermission(
-                this,
-                android.Manifest.permission.RECORD_AUDIO
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-
-            if (hasRecordPermission) {
-                visualizer = android.media.audiofx.Visualizer(audioSessionId).apply {
-                    captureSize = android.media.audiofx.Visualizer.getCaptureSizeRange()[1]
-                    setDataCaptureListener(object : android.media.audiofx.Visualizer.OnDataCaptureListener {
-                        override fun onWaveFormDataCapture(v: android.media.audiofx.Visualizer?, waveform: ByteArray?, samplingRate: Int) {
-                            if (waveform != null && waveform.isNotEmpty()) {
-                                var sum = 0f
-                                for (i in 0 until waveform.size) {
-                                    val amplitudeValue = (waveform[i].toInt() and 0xFF) - 128
-                                    sum += Math.abs(amplitudeValue).toFloat()
-                                }
-                                _amplitude.value = (sum / waveform.size) / 128f
+            visualizer = android.media.audiofx.Visualizer(audioSessionId).apply {
+                captureSize = android.media.audiofx.Visualizer.getCaptureSizeRange()[1]
+                setDataCaptureListener(object : android.media.audiofx.Visualizer.OnDataCaptureListener {
+                    override fun onWaveFormDataCapture(v: android.media.audiofx.Visualizer?, waveform: ByteArray?, samplingRate: Int) {
+                        if (waveform != null && waveform.isNotEmpty()) {
+                            var sum = 0f
+                            for (i in 0 until waveform.size) {
+                                val amplitude = (waveform[i].toInt() and 0xFF) - 128
+                                sum += Math.abs(amplitude).toFloat()
                             }
+                            _amplitude.value = (sum / waveform.size) / 128f
                         }
+                    }
 
-                        override fun onFftDataCapture(v: android.media.audiofx.Visualizer?, fft: ByteArray?, samplingRate: Int) {}
-                    }, android.media.audiofx.Visualizer.getMaxCaptureRate() / 2, true, false)
-                    enabled = true
-                }
+                    override fun onFftDataCapture(v: android.media.audiofx.Visualizer?, fft: ByteArray?, samplingRate: Int) {}
+                }, android.media.audiofx.Visualizer.getMaxCaptureRate() / 2, true, false)
+                enabled = true
             }
         } catch (e: Exception) {
             e.printStackTrace()

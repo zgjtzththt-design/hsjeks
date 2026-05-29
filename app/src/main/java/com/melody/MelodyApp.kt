@@ -1,5 +1,6 @@
 package com.melody
 
+// Forced recomile for MelodyApp
 import android.app.Application
 import com.melody.data.MusicDatabase
 
