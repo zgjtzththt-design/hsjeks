@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
@@ -679,16 +680,34 @@ fun PlayerScreen(
     
     val dominantColor by animateColorAsState(
         targetValue = if (rawDominantColor == Color.Transparent) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else rawDominantColor,
-        animationSpec = tween(1000),
+        animationSpec = tween(1200),
         label = "SmoothColor"
+    )
+
+    // Rotation animation when song changes
+    var rotationAngle by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(song.id) {
+        rotationAngle += 360f
+    }
+    val animatedRotation by animateFloatAsState(
+        targetValue = rotationAngle,
+        animationSpec = spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow),
+        label = "AlbumRotation"
+    )
+
+    // Scale animation based on playback state
+    val albumScale by animateFloatAsState(
+        targetValue = if (isPlaying) 1f else 0.85f,
+        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow),
+        label = "AlbumScale"
     )
 
     val infiniteTransition = rememberInfiniteTransition(label = "PulseTransition")
     val animatedAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.2f,
-        targetValue = 0.6f,
+        initialValue = 0.1f,
+        targetValue = 0.4f,
         animationSpec = infiniteRepeatable(
-            animation = tween(3000, easing = FastOutSlowInEasing),
+            animation = tween(4000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "ColorPulse"
@@ -699,19 +718,18 @@ fun PlayerScreen(
         modifier = Modifier.fillMaxSize()
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Animated background glow at bottom
+            // Atmospheric Radial Gradient
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(300.dp)
-                    .align(Alignment.BottomCenter)
+                    .fillMaxSize()
                     .background(
-                        Brush.verticalGradient(
+                        Brush.radialGradient(
                             colors = listOf(
-                                Color.Transparent,
-                                dominantColor.copy(alpha = animatedAlpha * 0.5f),
-                                dominantColor.copy(alpha = animatedAlpha)
-                            )
+                                dominantColor.copy(alpha = animatedAlpha),
+                                Color.Transparent
+                            ),
+                            center = Offset(0.5f, 0.8f),
+                            radius = 2000f
                         )
                     )
             )
@@ -731,22 +749,30 @@ fun PlayerScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.weight(1f))
+                Spacer(modifier = Modifier.weight(1.2f))
 
-                AlbumArt(
-                    uri = song.albumArtUri,
-                    size = 300.dp,
-                    shape = artShape,
-                    onBitmapLoaded = { bitmap ->
-                        Palette.from(bitmap).generate { palette ->
-                            val color = palette?.dominantSwatch?.rgb?.let { Color(it) }
-                                ?: palette?.vibrantSwatch?.rgb?.let { Color(it) }
-                                ?: palette?.mutedSwatch?.rgb?.let { Color(it) }
-                            
-                            color?.let { musicViewModel.setDominantColor(it) }
-                        }
+                Box(
+                    modifier = Modifier.graphicsLayer {
+                        scaleX = albumScale
+                        scaleY = albumScale
+                        rotationZ = animatedRotation
                     }
-                )
+                ) {
+                    AlbumArt(
+                        uri = song.albumArtUri,
+                        size = 320.dp,
+                        shape = artShape,
+                        onBitmapLoaded = { bitmap ->
+                            Palette.from(bitmap).generate { palette ->
+                                val color = palette?.vibrantSwatch?.rgb?.let { Color(it) }
+                                    ?: palette?.dominantSwatch?.rgb?.let { Color(it) }
+                                    ?: palette?.mutedSwatch?.rgb?.let { Color(it) }
+                                
+                                color?.let { musicViewModel.setDominantColor(it) }
+                            }
+                        }
+                    )
+                }
 
             Spacer(modifier = Modifier.weight(1f))
 
