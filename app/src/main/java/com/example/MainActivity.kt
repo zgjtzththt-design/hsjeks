@@ -17,6 +17,28 @@ class MainActivity : ComponentActivity() {
   private val musicViewModel: MusicViewModel by viewModels()
   private val themeViewModel: ThemeViewModel by viewModels()
 
+  override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+      when (keyCode) {
+          android.view.KeyEvent.KEYCODE_VOLUME_UP -> {
+              musicViewModel.increaseVolume()
+              return true
+          }
+          android.view.KeyEvent.KEYCODE_VOLUME_DOWN -> {
+              musicViewModel.decreaseVolume()
+              return true
+          }
+      }
+      return super.onKeyDown(keyCode, event)
+  }
+
+  override fun onKeyUp(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+      when (keyCode) {
+          android.view.KeyEvent.KEYCODE_VOLUME_UP,
+          android.view.KeyEvent.KEYCODE_VOLUME_DOWN -> return true
+      }
+      return super.onKeyUp(keyCode, event)
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
@@ -32,6 +54,13 @@ class MainActivity : ComponentActivity() {
             add(Manifest.permission.POST_NOTIFICATIONS)
           } else {
             add(Manifest.permission.READ_EXTERNAL_STORAGE)
+          }
+          
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            add(Manifest.permission.BLUETOOTH_SCAN)
+            add(Manifest.permission.BLUETOOTH_CONNECT)
+          } else {
+            add(Manifest.permission.ACCESS_FINE_LOCATION)
           }
         }
 

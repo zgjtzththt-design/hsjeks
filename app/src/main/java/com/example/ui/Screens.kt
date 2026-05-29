@@ -264,19 +264,23 @@ fun MainScreen(
     val pagerState = rememberPagerState(pageCount = { 4 })
     val coroutineScope = rememberCoroutineScope()
 
-    AnimatedContent(
-        targetState = showPlayer && currentSong != null,
-        transitionSpec = {
-            if (targetState) {
-                (slideInVertically { height -> height } + fadeIn()).togetherWith(
-                    slideOutVertically { height -> -height } + fadeOut())
-            } else {
-                (slideInVertically { height -> -height } + fadeIn()).togetherWith(
-                    slideOutVertically { height -> height } + fadeOut())
-            }.using(SizeTransform(clip = false))
-        },
-        label = "PlayerTransition"
-    ) { isPlayerVisible ->
+    val showVolumeBar by musicViewModel.showVolumeBar.collectAsState()
+    val volumeLevel by musicViewModel.volumeLevel.collectAsState()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        AnimatedContent(
+            targetState = showPlayer && currentSong != null,
+            transitionSpec = {
+                if (targetState) {
+                    (slideInVertically { height -> height } + fadeIn()).togetherWith(
+                        slideOutVertically { height -> -height } + fadeOut())
+                } else {
+                    (slideInVertically { height -> -height } + fadeIn()).togetherWith(
+                        slideOutVertically { height -> height } + fadeOut())
+                }.using(SizeTransform(clip = false))
+            },
+            label = "PlayerTransition"
+        ) { isPlayerVisible ->
         if (isPlayerVisible && currentSong != null) {
             PlayerScreen(
                 musicViewModel = musicViewModel,
@@ -286,7 +290,49 @@ fun MainScreen(
                 onDismiss = { showPlayer = false }
             )
         } else {
+            var showBluetoothDialog by remember { mutableStateOf(false) }
+
+            if (showBluetoothDialog) {
+                BluetoothBatterySheet(musicViewModel = musicViewModel, onDismiss = { showBluetoothDialog = false })
+            }
+
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val mediaRouter = remember { androidx.mediarouter.media.MediaRouter.getInstance(context) }
+            val selector = remember { 
+                androidx.mediarouter.media.MediaRouteSelector.Builder()
+                    .addControlCategory(androidx.mediarouter.media.MediaControlIntent.CATEGORY_LIVE_AUDIO)
+                    .addControlCategory(androidx.mediarouter.media.MediaControlIntent.CATEGORY_REMOTE_PLAYBACK)
+                    .build()
+            }
+
             Scaffold(
+                topBar = {
+                    @OptIn(ExperimentalMaterial3Api::class)
+                    TopAppBar(
+                        title = { Text(text = "Melody", fontWeight = FontWeight.Bold) },
+                        actions = {
+                            IconButton(onClick = { 
+                                val activity = context as? android.app.Activity
+                                if (activity != null) {
+                                    // Use system cast chooser via Settings if possible
+                                    val intent = android.content.Intent(android.provider.Settings.ACTION_CAST_SETTINGS)
+                                    context.startActivity(intent)
+                                }
+                            }) {
+                                Icon(Icons.Default.Cast, contentDescription = "Cast")
+                            }
+                            IconButton(onClick = { 
+                                musicViewModel.updateBluetoothDevices()
+                                showBluetoothDialog = true 
+                            }) {
+                                Icon(Icons.Default.Bluetooth, contentDescription = "Bluetooth Devices")
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent
+                        )
+                    )
+                },
                 bottomBar = {
                     Column {
                         if (currentSong != null) {
@@ -380,8 +426,21 @@ fun MainScreen(
                 }
             }
         }
-    }
-}
+        } // close AnimatedContent lambda
+        
+        // Custom Volume overlay
+        AnimatedVisibility(
+            visible = showVolumeBar,
+            enter = slideInVertically { -it } + fadeIn(),
+            exit = slideOutVertically { -it } + fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(horizontal = 24.dp, vertical = 64.dp)
+        ) {
+            CustomVolumeBar(volumeLevel)
+        }
+    } // close Box
+} // close MainScreen
 
 @Composable
 fun EmptyState(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
@@ -717,27 +776,31 @@ fun AlbumArt(
             .clip(shape),
         color = MaterialTheme.colorScheme.surfaceVariant
     ) {
-        if (uri != null) {
-            SubcomposeAsyncImage(
-                model = uri,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-                loading = { PlaceholderArt() },
-                error = { PlaceholderArt() },
-                onSuccess = { state ->
-                    val drawable = state.result.drawable
-                    if (drawable is BitmapDrawable && onBitmapLoaded != null) {
-                        onBitmapLoaded(drawable.bitmap)
-                    }
-                }
-            )
-        } else {
+        Box(modifier = Modifier.fillMaxSize()) {
             PlaceholderArt()
+            if (uri != null) {
+                AsyncImage(
+                    model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                        .data(uri)
+                        .crossfade(true)
+                        .allowHardware(false)
+                        .build(),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    onSuccess = { state ->
+                        val drawable = state.result.drawable
+                        if (drawable is BitmapDrawable && onBitmapLoaded != null) {
+                            onBitmapLoaded(drawable.bitmap)
+                        }
+                    }
+                )
+            }
         }
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(
     musicViewModel: MusicViewModel,
@@ -882,23 +945,45 @@ fun PlayerScreen(
                     if (enableRain) {
                         AnimatedRainEffect(modifier = Modifier.matchParentSize())
                     }
-                    
-                    DropdownMenu(
-                        expanded = showAlbumMenu,
-                        onDismissRequest = { showAlbumMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Rain Effect") },
-                            onClick = { enableRain = !enableRain; showAlbumMenu = false },
-                            trailingIcon = { if (enableRain) Icon(Icons.Default.Check, contentDescription = null) }
+                }
+
+            if (showAlbumMenu) {
+                ModalBottomSheet(
+                    onDismissRequest = { showAlbumMenu = false },
+                    sheetState = rememberModalBottomSheetState()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp).padding(bottom = 24.dp)) {
+                        Text(
+                            text = "Album Options",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 16.dp)
                         )
-                        DropdownMenuItem(
-                            text = { Text("Beat Bounce") },
-                            onClick = { enableBeatBounce = !enableBeatBounce; showAlbumMenu = false },
-                            trailingIcon = { if (enableBeatBounce) Icon(Icons.Default.Check, contentDescription = null) }
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { enableRain = !enableRain }
+                                .padding(vertical = 12.dp)
+                        ) {
+                            Icon(Icons.Outlined.Thunderstorm, contentDescription = null, modifier = Modifier.padding(end = 16.dp))
+                            Text("Realistic Rain Effect", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                            Switch(checked = enableRain, onCheckedChange = { enableRain = it })
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { enableBeatBounce = !enableBeatBounce }
+                                .padding(vertical = 12.dp)
+                        ) {
+                            Icon(Icons.Outlined.Animation, contentDescription = null, modifier = Modifier.padding(end = 16.dp))
+                            Text("Beat Bounce", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                            Switch(checked = enableBeatBounce, onCheckedChange = { enableBeatBounce = it })
+                        }
                     }
                 }
+            }
 
             Spacer(modifier = Modifier.weight(1f))
 
@@ -1073,25 +1158,69 @@ fun AnimatedRainEffect(modifier: Modifier = Modifier) {
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = LinearEasing),
+            animation = tween(1200, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "DropProgress"
     )
+    
+    val dropletAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "DropletAlpha"
+    )
 
     Canvas(modifier = modifier) {
-        val dropCount = 20
+        val dropCount = 40
+        val screenDroplets = 15
+        
+        // Falling Rain
         repeat(dropCount) { i ->
-            val randomX = (i * size.width / dropCount) + ((i * 7) % 20) * 2f
-            val offsetY = (dropProgress + (i * 0.13f)) % 1f
+            val randomX = (i * size.width / dropCount) + ((i * 13) % 20) * 3f
+            
+            // Fixed speed for drops to prevent jumping, use modulo for staggering
+            val stagger = (i * 0.31f) % 1f
+            val offsetY = (dropProgress + stagger) % 1f
             val yPos = offsetY * size.height
-            val length = 20f + (i % 5) * 5f
+            
+            // Angle the rain slightly
+            val angleX = -20f 
+            val length = 30f + (i % 5) * 15f
+            val alpha = 0.3f + (i % 4) * 0.1f
             
             drawLine(
-                color = Color.White.copy(alpha = 0.5f),
+                color = Color.White.copy(alpha = alpha),
                 start = Offset(randomX, yPos),
-                end = Offset(randomX - 5f, yPos + length),
-                strokeWidth = 2f
+                end = Offset(randomX + angleX, yPos + length),
+                strokeWidth = 2f + (i % 2)
+            )
+        }
+        
+        // Static Water Droplets on Lens/Screen
+        repeat(screenDroplets) { i ->
+            val dropletX = ((i * 37) % 100) / 100f * size.width
+            val dropletY = ((i * 61) % 100) / 100f * size.height
+            val dropletSize = 4f + (i % 5) * 2f
+            
+            // Draw highlight and shadow to make drop look 3d
+            drawCircle(
+                color = Color.Black.copy(alpha = 0.15f * dropletAlpha),
+                radius = dropletSize,
+                center = Offset(dropletX, dropletY + 1f)
+            )
+            drawCircle(
+                color = Color.White.copy(alpha = 0.4f * dropletAlpha),
+                radius = dropletSize * 0.8f,
+                center = Offset(dropletX, dropletY)
+            )
+            drawCircle(
+                color = Color.White.copy(alpha = 0.8f * dropletAlpha),
+                radius = dropletSize * 0.3f,
+                center = Offset(dropletX - dropletSize * 0.2f, dropletY - dropletSize * 0.2f)
             )
         }
     }
@@ -1682,4 +1811,148 @@ fun ColorOption(color: androidx.compose.ui.graphics.Color, isSelected: Boolean, 
         shape = MaterialTheme.shapes.small,
         border = if (isSelected) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface) else null
     ) {}
+}
+
+@Composable
+fun CustomVolumeBar(volumeLevel: Int) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp),
+        shadowElevation = 8.dp,
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (volumeLevel == 0) Icons.Default.VolumeOff else if (volumeLevel > 100) Icons.Default.VolumeUp else Icons.Default.VolumeDown,
+                contentDescription = null,
+                tint = if (volumeLevel > 100) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+            )
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+            ) {
+                // The progress width handles 0-300
+                val progress = (volumeLevel / 300f).coerceIn(0f, 1f)
+                val color = if (volumeLevel > 100) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(progress)
+                        .background(color)
+                )
+            }
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            Text(
+                text = "${volumeLevel}%",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = if (volumeLevel > 100) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BluetoothBatterySheet(musicViewModel: MusicViewModel, onDismiss: () -> Unit) {
+    val devices by musicViewModel.bluetoothDevices.collectAsState()
+    
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .padding(bottom = 32.dp)
+        ) {
+            Text("Bluetooth Devices", 
+                style = MaterialTheme.typography.titleLarge, 
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            if (devices.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(100.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No paired devices found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                androidx.compose.foundation.lazy.LazyColumn(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(devices) { device ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center, 
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                            ) {
+                                Icon(
+                                    imageVector = if (device.name.lowercase().contains("headphones") || device.name.lowercase().contains("earbuds")) 
+                                        Icons.Default.Headset else Icons.Default.Bluetooth,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.width(16.dp))
+                            
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(device.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                                Text(device.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+
+                            if (device.batteryLevel != null) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = if (device.batteryLevel > 20) Icons.Default.BatteryFull else Icons.Default.BatteryAlert,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = if (device.batteryLevel > 20) Color.Green else Color.Red
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("${device.batteryLevel}%", style = MaterialTheme.typography.bodyMedium)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text("Close")
+            }
+        }
+    }
 }

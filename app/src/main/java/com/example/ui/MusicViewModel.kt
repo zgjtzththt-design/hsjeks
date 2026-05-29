@@ -2,6 +2,8 @@ package com.example.ui
 
 import android.app.Application
 import android.content.ContentUris
+import android.content.Context
+import android.media.AudioManager
 import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -21,16 +23,24 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
-
 import kotlinx.coroutines.flow.combine
 import com.example.repository.MusicRepository
 import com.example.BuildConfig
-
 import com.example.api.*
 import kotlinx.serialization.json.*
 
 class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = MusicRepository((application as MelodyApp).database.musicDao())
+
+    private val audioManager by lazy { application.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+    private val maxSysVolume by lazy { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) }
+
+    private val _volumeLevel = MutableStateFlow(100)
+    val volumeLevel: StateFlow<Int> = _volumeLevel
+
+    private val _showVolumeBar = MutableStateFlow(false)
+    val showVolumeBar: StateFlow<Boolean> = _showVolumeBar
+    private var volumeHideJob: kotlinx.coroutines.Job? = null
 
     private val _onlineSearchResults = MutableStateFlow<List<MusicSearchResult>>(emptyList())
     val onlineSearchResults: StateFlow<List<MusicSearchResult>> = _onlineSearchResults
@@ -64,13 +74,89 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _dominantColor = MutableStateFlow<androidx.compose.ui.graphics.Color>(androidx.compose.ui.graphics.Color.Transparent)
     val dominantColor: StateFlow<androidx.compose.ui.graphics.Color> = _dominantColor
 
+    data class BluetoothDeviceRecord(
+        val name: String,
+        val address: String,
+        val batteryLevel: Int? = null,
+        val isConnected: Boolean = false
+    )
+
+    private val _bluetoothDevices = MutableStateFlow<List<BluetoothDeviceRecord>>(emptyList())
+    val bluetoothDevices: StateFlow<List<BluetoothDeviceRecord>> = _bluetoothDevices
+
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var mediaController: MediaController? = null
 
     init {
+        val currentSysVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        _volumeLevel.value = ((currentSysVol.toFloat() / maxSysVolume) * 100).toInt()
         loadSongs()
         setupMediaController()
         startProgressUpdate()
+        updateBluetoothDevices()
+    }
+    
+    fun updateBluetoothDevices() {
+        val bluetoothManager = getApplication<Application>().getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
+        val adapter = bluetoothManager?.adapter
+        
+        if (adapter != null) {
+            try {
+                val pairedDevices = adapter.bondedDevices
+                val devices = pairedDevices.map { device ->
+                    var battery: Int? = null
+                    try {
+                        val method = device.javaClass.getMethod("getBatteryLevel")
+                        val level = method.invoke(device) as Int
+                        if (level in 0..100) battery = level
+                    } catch (e: Exception) {}
+
+                    BluetoothDeviceRecord(
+                        name = device.name ?: "Unknown Device",
+                        address = device.address,
+                        batteryLevel = battery,
+                        isConnected = false 
+                    )
+                }
+                _bluetoothDevices.value = devices
+            } catch (e: SecurityException) {
+                e.printStackTrace()
+            }
+        }
+    }
+    
+    fun increaseVolume() {
+        setVolumeLevel((_volumeLevel.value + 15).coerceAtMost(300))
+    }
+
+    fun decreaseVolume() {
+        setVolumeLevel((_volumeLevel.value - 15).coerceAtLeast(0))
+    }
+
+    fun setVolumeLevel(level: Int) {
+        _volumeLevel.value = level
+        
+        val sysTarget = ((level.coerceAtMost(100).toFloat() / 100) * maxSysVolume).toInt()
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, sysTarget, 0)
+        
+        if (level > 100) {
+            val boostPercent = level - 100
+            val gainmB = boostPercent * 25
+            PlaybackService.loudnessEnhancer?.setTargetGain(gainmB)
+        } else {
+            PlaybackService.loudnessEnhancer?.setTargetGain(0)
+        }
+        
+        showVolumeBarForAWhile()
+    }
+
+    private fun showVolumeBarForAWhile() {
+        _showVolumeBar.value = true
+        volumeHideJob?.cancel()
+        volumeHideJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(2500)
+            _showVolumeBar.value = false
+        }
     }
 
     private fun startProgressUpdate() {

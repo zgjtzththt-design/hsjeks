@@ -11,6 +11,11 @@ import androidx.media3.session.MediaSessionService
 class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
 
+    companion object {
+        var loudnessEnhancer: android.media.audiofx.LoudnessEnhancer? = null
+            private set
+    }
+
     @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
@@ -23,6 +28,21 @@ class PlaybackService : MediaSessionService() {
             .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true)
             .build()
+
+        player.addListener(object : androidx.media3.common.Player.Listener {
+            override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                if (audioSessionId != C.AUDIO_SESSION_ID_UNSET) {
+                    try {
+                        loudnessEnhancer?.release()
+                        loudnessEnhancer = android.media.audiofx.LoudnessEnhancer(audioSessionId).apply {
+                            enabled = true
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        })
 
         mediaSession = MediaSession.Builder(this, player).build()
     }
