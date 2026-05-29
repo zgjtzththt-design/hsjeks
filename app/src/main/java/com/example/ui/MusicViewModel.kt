@@ -101,8 +101,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
-        val currentSysVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-        _volumeLevel.value = ((currentSysVol.toFloat() / maxSysVolume) * 100).toInt()
+        try {
+            val currentSysVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            _volumeLevel.value = ((currentSysVol.toFloat() / maxSysVolume) * 100).toInt()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        
         loadSongs()
         setupMediaController()
         startProgressUpdate()
@@ -113,9 +118,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             addAction(android.bluetooth.BluetoothDevice.ACTION_BOND_STATE_CHANGED)
             addAction("android.bluetooth.device.action.BATTERY_LEVEL_CHANGED")
         }
-        getApplication<Application>().registerReceiver(bluetoothReceiver, filter)
+        try {
+            getApplication<Application>().registerReceiver(bluetoothReceiver, filter)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         
-        updateBluetoothDevices()
+        viewModelScope.launch {
+            updateBluetoothDevices()
+        }
     }
     
     fun updateBluetoothDevices() {

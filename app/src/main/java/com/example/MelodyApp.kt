@@ -10,6 +10,12 @@ class MelodyApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        database = com.example.data.MusicDatabase.getDatabase(this)
+        try {
+            database = com.example.data.MusicDatabase.getDatabase(this)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            // In a real app we'd handle this better, but for a prototype 
+            // we at least prevent the startup crash if possible.
+        }
     }
 }

@@ -8,13 +8,13 @@ plugins {
 }
 
 android {
-  namespace = "com.example"
-  compileSdk = 34
+  namespace = "com.melody"
+  compileSdk = 35
 
   defaultConfig {
     applicationId = "com.aistudio.melody.music.qwpzrx"
     minSdk = 24
-    targetSdk = 34
+    targetSdk = 35
     versionCode = 1
     versionName = "1.0"
 
@@ -106,6 +106,7 @@ dependencies {
   implementation(libs.androidx.media3.exoplayer)
   implementation(libs.androidx.media3.ui)
   implementation(libs.androidx.media3.session)
+  implementation(libs.androidx.mediarouter)
   implementation(libs.kotlinx.serialization.json)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)

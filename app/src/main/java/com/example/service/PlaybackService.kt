@@ -31,14 +31,16 @@ class PlaybackService : MediaSessionService() {
 
         player.addListener(object : androidx.media3.common.Player.Listener {
             override fun onAudioSessionIdChanged(audioSessionId: Int) {
-                if (audioSessionId != C.AUDIO_SESSION_ID_UNSET) {
+                if (audioSessionId != C.AUDIO_SESSION_ID_UNSET && audioSessionId != 0) {
                     try {
                         loudnessEnhancer?.release()
+                        loudnessEnhancer = null
                         loudnessEnhancer = android.media.audiofx.LoudnessEnhancer(audioSessionId).apply {
                             enabled = true
                         }
                     } catch (e: Exception) {
                         e.printStackTrace()
+                        loudnessEnhancer = null
                     }
                 }
             }
