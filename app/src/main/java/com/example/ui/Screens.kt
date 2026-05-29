@@ -872,10 +872,21 @@ fun OnlineSearchDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Global Music Search") 
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Global Discovery", style = MaterialTheme.typography.titleLarge)
+                    if (isSearching) {
+                        Text("Connecting to servers...", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                if (isSearching) {
+                    HyperLoadingIndicator(modifier = Modifier.size(width = 32.dp, height = 4.dp))
+                }
             }
         },
         text = {
@@ -907,7 +918,7 @@ fun OnlineSearchDialog(
                 
                 if (isSearching) {
                     Box(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                        HyperLoadingIndicator()
                     }
                 } else if (results.isNotEmpty()) {
                     Text("Internet Search Results:", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
@@ -1160,6 +1171,112 @@ fun Modifier.glassEffect(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
+fun HyperLoadingIndicator(
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "HyperLoading")
+    
+    val width by infiniteTransition.animateFloat(
+        initialValue = 24f,
+        targetValue = 64f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "Width"
+    )
+
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "Alpha"
+    )
+
+    Box(
+        modifier = modifier
+            .width(width.dp)
+            .height(8.dp)
+            .clip(CircleShape)
+            .background(color.copy(alpha = alpha))
+    )
+}
+
+@Composable
+fun SettingsItem(
+    title: String,
+    subtitle: String? = null,
+    icon: ImageVector,
+    iconContainerColor: Color = MaterialTheme.colorScheme.primaryContainer,
+    iconColor: Color = MaterialTheme.colorScheme.onPrimaryContainer,
+    trailing: @Composable (() -> Unit)? = null,
+    onClick: (() -> Unit)? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = iconContainerColor,
+            modifier = Modifier.size(40.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
+            }
+        }
+        
+        Spacer(modifier = Modifier.width(16.dp))
+        
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            if (subtitle != null) {
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        
+        if (trailing != null) {
+            Box(modifier = Modifier.padding(start = 8.dp)) {
+                trailing()
+            }
+        }
+    }
+}
+
+@Composable
+fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(modifier = Modifier.padding(bottom = 24.dp)) {
+        Text(
+            text = title.uppercase(),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            letterSpacing = 1.2.sp
+        )
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            tonalElevation = 1.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp)
+        ) {
+            Column {
+                content()
+            }
+        }
+    }
+}
+
+@Composable
 fun SettingsScreen(viewModel: ThemeViewModel) {
     val dynamicColor by viewModel.useDynamicColor.collectAsState()
     val primaryColor by viewModel.primaryColor.collectAsState()
@@ -1171,76 +1288,122 @@ fun SettingsScreen(viewModel: ThemeViewModel) {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp)
+            .padding(top = 16.dp, bottom = 32.dp)
     ) {
-        Text("Appearance", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        SettingsToggle(
-            title = "Dynamic Color",
-            subtitle = "Use colors derived from wallpaper (Android 12+)",
-            checked = dynamicColor,
-            onCheckedChange = { viewModel.setDynamicColor(it) }
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
+        SettingsGroup(title = "Visual Essence") {
+            SettingsItem(
+                title = "Dynamic Theming",
+                subtitle = "Sync interface with system wallpaper",
+                icon = Icons.Rounded.Palette,
+                iconContainerColor = Color(0xFF4CAF50).copy(alpha = 0.2f),
+                iconColor = Color(0xFF2E7D32),
+                trailing = {
+                    Switch(
+                        checked = dynamicColor,
+                        onCheckedChange = { viewModel.setDynamicColor(it) }
+                    )
+                }
+            )
+            
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
-        SettingsToggle(
-            title = "Liquid Glass Effect",
-            subtitle = "Apply transparent blur to lists and navigation",
-            checked = isGlassEnabled,
-            onCheckedChange = { viewModel.setGlassEffectEnabled(it) }
-        )
+            SettingsItem(
+                title = "Liquid Glass",
+                subtitle = "Vibrant transparency & blur",
+                icon = Icons.Rounded.BlurOn,
+                iconContainerColor = Color(0xFF2196F3).copy(alpha = 0.2f),
+                iconColor = Color(0xFF1976D2),
+                trailing = {
+                    Switch(
+                        checked = isGlassEnabled,
+                        onCheckedChange = { viewModel.setGlassEffectEnabled(it) }
+                    )
+                }
+            )
+        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        SettingsGroup(title = "Interface") {
+            SettingsItem(
+                title = "Compact Mode",
+                subtitle = "Maximize content on screen",
+                icon = Icons.Rounded.ViewList,
+                iconContainerColor = Color(0xFFFF9800).copy(alpha = 0.2f),
+                iconColor = Color(0xFFE65100),
+                trailing = {
+                    Switch(
+                        checked = useCompactLayout,
+                        onCheckedChange = { viewModel.setCompactLayout(it) }
+                    )
+                }
+            )
+        }
 
-        SettingsToggle(
-            title = "Compact Layout",
-            subtitle = "Smaller list items to show more content",
-            checked = useCompactLayout,
-            onCheckedChange = { viewModel.setCompactLayout(it) }
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-        Text("Album Art Shape", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(12.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            AlbumArtShapes.forEachIndexed { index, shape ->
-                Surface(
-                    onClick = { viewModel.setAlbumArtShape(index) },
-                    shape = shape,
-                    modifier = Modifier.size(56.dp),
-                    color = if (albumArtShapeIndex == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+        SettingsGroup(title = "Creative Canvas") {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Album Art Geometry", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(16.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        if (albumArtShapeIndex == index) {
-                            Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
+                    AlbumArtShapes.forEachIndexed { index, shape ->
+                        val isSelected = albumArtShapeIndex == index
+                        Surface(
+                            onClick = { viewModel.setAlbumArtShape(index) },
+                            shape = shape,
+                            modifier = Modifier.size(64.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            tonalElevation = if (isSelected) 8.dp else 0.dp
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                if (isSelected) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!dynamicColor) {
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Atmospheric Accent", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        val colors = listOf(
+                            Color(0xFF673AB7), Color(0xFF2196F3), Color(0xFFF44336),
+                            Color(0xFF4CAF50), Color(0xFFFF9800), Color(0xFFE91E63)
+                        )
+                        colors.forEach { color ->
+                            ColorOption(color, primaryColor == color) { viewModel.setPrimaryColor(color) }
                         }
                     }
                 }
             }
         }
-
-        if (!dynamicColor) {
-            Spacer(modifier = Modifier.height(24.dp))
-            Text("Accent Color", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(12.dp))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                ColorOption(Color(0xFF673AB7), primaryColor == Color(0xFF673AB7)) { viewModel.setPrimaryColor(Color(0xFF673AB7)) } // Purple
-                ColorOption(Color(0xFF2196F3), primaryColor == Color(0xFF2196F3)) { viewModel.setPrimaryColor(Color(0xFF2196F3)) } // Blue
-                ColorOption(Color(0xFFF44336), primaryColor == Color(0xFFF44336)) { viewModel.setPrimaryColor(Color(0xFFF44336)) } // Red
-                ColorOption(Color(0xFF4CAF50), primaryColor == Color(0xFF4CAF50)) { viewModel.setPrimaryColor(Color(0xFF4CAF50)) } // Green
-                ColorOption(Color(0xFFFF9800), primaryColor == Color(0xFFFF9800)) { viewModel.setPrimaryColor(Color(0xFFFF9800)) } // Orange
-                ColorOption(Color(0xFFE91E63), primaryColor == Color(0xFFE91E63)) { viewModel.setPrimaryColor(Color(0xFFE91E63)) } // Pink
-            }
+        
+        SettingsGroup(title = "Information") {
+            SettingsItem(
+                title = "Melody Stream",
+                subtitle = "Stable Build 4.2.1-Liquid",
+                icon = Icons.Rounded.Info,
+                iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                iconColor = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+            SettingsItem(
+                title = "Open Source License",
+                subtitle = "Inspired by HyperBridge Project",
+                icon = Icons.Rounded.Code,
+                iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                iconColor = MaterialTheme.colorScheme.onTertiaryContainer
+            )
         }
     }
 }
