@@ -10,10 +10,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -61,6 +65,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.Canvas
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import android.graphics.Bitmap
@@ -362,7 +367,7 @@ fun MainScreen(
                             artShape = albumArtShape, 
                             isGlassEnabled = isGlassEnabled,
                             onOnlineSearchClick = { showOnlineSearch = true },
-                            onSongClick = { musicViewModel.playSong(it) }
+                            onSongClick = { musicViewModel.playSong(it, filteredSongs) }
                         )
                         1 -> FolderList(songs = songs, useCompact = useCompactLayout)
                         2 -> PlaylistList(
@@ -407,6 +412,9 @@ fun SongList(
     onOnlineSearchClick: () -> Unit,
     onSongClick: (Song) -> Unit
 ) {
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    
     Column {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -457,15 +465,79 @@ fun SongList(
             }
         }
         
-        LazyColumn(contentPadding = PaddingValues(bottom = 8.dp)) {
-            items(songs, key = { it.id }) { song ->
-                SongItem(
-                    song = song, 
-                    isCompact = useCompact, 
-                    artShape = artShape, 
-                    isGlassEnabled = isGlassEnabled,
-                    onClick = { onSongClick(song) }
-                )
+        Box(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                state = listState,
+                contentPadding = PaddingValues(bottom = 8.dp, start = 16.dp) // Added start padding for the handle
+            ) {
+                items(songs, key = { it.id }) { song ->
+                    SongItem(
+                        song = song, 
+                        isCompact = useCompact, 
+                        artShape = artShape, 
+                        isGlassEnabled = isGlassEnabled,
+                        onClick = { onSongClick(song) }
+                    )
+                }
+            }
+
+            // Fast Scroll Handle on the left
+            if (songs.size > 10) {
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .fillMaxHeight()
+                        .width(24.dp)
+                ) {
+                    val heightPixels = constraints.maxHeight.toFloat()
+                    val itemCount = songs.size
+                    
+                    // Simple handle position calculation
+                    val scrollOffset = remember { derivedStateOf { 
+                        if (itemCount > 1) {
+                            (listState.firstVisibleItemIndex.toFloat() / (itemCount - 1).toFloat()).coerceIn(0f, 1f)
+                        } else 0f
+                    } }
+
+                    var isDragging by remember { mutableStateOf(false) }
+                    var lastTargetIndex by remember { mutableIntStateOf(-1) }
+                    var scrollJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+
+                    Box(
+                        modifier = Modifier
+                            .graphicsLayer {
+                                translationY = scrollOffset.value * (heightPixels - 56.dp.toPx())
+                            }
+                            .size(width = 6.dp, height = 56.dp)
+                            .background(
+                                if (isDragging) MaterialTheme.colorScheme.primary 
+                                else MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                                RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp)
+                            )
+                            .pointerInput(songs.size) {
+                                detectVerticalDragGestures(
+                                    onDragStart = { isDragging = true },
+                                    onDragEnd = { isDragging = false },
+                                    onDragCancel = { isDragging = false },
+                                    onVerticalDrag = { change, dragAmount ->
+                                        change.consume()
+                                        val currentY = scrollOffset.value * (heightPixels - 56.dp.toPx())
+                                        val nextY = (currentY + dragAmount).coerceIn(0f, heightPixels - 56.dp.toPx())
+                                        val percentage = nextY / (heightPixels - 56.dp.toPx())
+                                        val targetIndex = (percentage * (itemCount - 1)).toInt()
+                                        
+                                        if (targetIndex != lastTargetIndex) {
+                                            lastTargetIndex = targetIndex
+                                            scrollJob?.cancel()
+                                            scrollJob = coroutineScope.launch {
+                                                listState.scrollToItem(targetIndex)
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                    )
+                }
             }
         }
     }
@@ -678,6 +750,10 @@ fun PlayerScreen(
     val duration by musicViewModel.currentDuration.collectAsState()
     val rawDominantColor by musicViewModel.dominantColor.collectAsState()
     
+    var showAlbumMenu by remember { mutableStateOf(false) }
+    var enableRain by remember { mutableStateOf(false) }
+    var enableBeatBounce by remember { mutableStateOf(false) }
+    
     val dominantColor by animateColorAsState(
         targetValue = if (rawDominantColor == Color.Transparent) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else rawDominantColor,
         animationSpec = tween(1200),
@@ -712,6 +788,17 @@ fun PlayerScreen(
         targetValue = if (isPlaying) 1f else 0.85f,
         animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow),
         label = "AlbumScale"
+    )
+
+    val infiniteTransitionBeat = rememberInfiniteTransition(label = "BeatTransition")
+    val beatScale by infiniteTransitionBeat.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(400, easing = LinearOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "BeatPulse"
     )
 
     val infiniteTransition = rememberInfiniteTransition(label = "PulseTransition")
@@ -765,10 +852,16 @@ fun PlayerScreen(
 
                 Box(
                     modifier = Modifier.graphicsLayer {
-                        scaleX = albumScale * animatedPopScale
-                        scaleY = albumScale * animatedPopScale
+                        val activeBeatScale = if (enableBeatBounce && isPlaying) beatScale else 1f
+                        scaleX = albumScale * animatedPopScale * activeBeatScale
+                        scaleY = albumScale * animatedPopScale * activeBeatScale
                         rotationY = animatedFlip
                         cameraDistance = 8 * density
+                    }
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onLongPress = { showAlbumMenu = true }
+                        )
                     }
                 ) {
                     AlbumArt(
@@ -785,6 +878,26 @@ fun PlayerScreen(
                             }
                         }
                     )
+                    
+                    if (enableRain) {
+                        AnimatedRainEffect(modifier = Modifier.matchParentSize())
+                    }
+                    
+                    DropdownMenu(
+                        expanded = showAlbumMenu,
+                        onDismissRequest = { showAlbumMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Rain Effect") },
+                            onClick = { enableRain = !enableRain; showAlbumMenu = false },
+                            trailingIcon = { if (enableRain) Icon(Icons.Default.Check, contentDescription = null) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Beat Bounce") },
+                            onClick = { enableBeatBounce = !enableBeatBounce; showAlbumMenu = false },
+                            trailingIcon = { if (enableBeatBounce) Icon(Icons.Default.Check, contentDescription = null) }
+                        )
+                    }
                 }
 
             Spacer(modifier = Modifier.weight(1f))
@@ -951,6 +1064,37 @@ fun PlayerScreen(
         }
     }
 }
+}
+
+@Composable
+fun AnimatedRainEffect(modifier: Modifier = Modifier) {
+    val infiniteTransition = rememberInfiniteTransition(label = "Rain")
+    val dropProgress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "DropProgress"
+    )
+
+    Canvas(modifier = modifier) {
+        val dropCount = 20
+        repeat(dropCount) { i ->
+            val randomX = (i * size.width / dropCount) + ((i * 7) % 20) * 2f
+            val offsetY = (dropProgress + (i * 0.13f)) % 1f
+            val yPos = offsetY * size.height
+            val length = 20f + (i % 5) * 5f
+            
+            drawLine(
+                color = Color.White.copy(alpha = 0.5f),
+                start = Offset(randomX, yPos),
+                end = Offset(randomX - 5f, yPos + length),
+                strokeWidth = 2f
+            )
+        }
+    }
 }
 
 private fun formatDuration(duration: Long): String {

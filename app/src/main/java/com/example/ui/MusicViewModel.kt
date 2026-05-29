@@ -162,21 +162,27 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun playSong(song: Song) {
+    fun playSong(song: Song, albumSongs: List<Song> = emptyList()) {
         mediaController?.let { controller ->
-            val mediaMetadata = androidx.media3.common.MediaMetadata.Builder()
-                .setTitle(song.title)
-                .setArtist(song.artist)
-                .setAlbumTitle(song.album)
-                .setArtworkUri(android.net.Uri.parse(song.albumArtUri ?: ""))
-                .build()
+            val contextSongs = if (albumSongs.isNotEmpty()) albumSongs else _songs.value
+            val startIndex = contextSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+            
+            val mediaItems = contextSongs.map { s ->
+                val mediaMetadata = androidx.media3.common.MediaMetadata.Builder()
+                    .setTitle(s.title)
+                    .setArtist(s.artist)
+                    .setAlbumTitle(s.album)
+                    .setArtworkUri(android.net.Uri.parse(s.albumArtUri ?: ""))
+                    .build()
 
-            val mediaItem = MediaItem.Builder()
-                .setMediaId(song.id)
-                .setUri(song.path)
-                .setMediaMetadata(mediaMetadata)
-                .build()
-            controller.setMediaItem(mediaItem)
+                MediaItem.Builder()
+                    .setMediaId(s.id)
+                    .setUri(s.path)
+                    .setMediaMetadata(mediaMetadata)
+                    .build()
+            }
+
+            controller.setMediaItems(mediaItems, startIndex, 0L)
             controller.prepare()
             controller.play()
             _currentSong.value = song
