@@ -125,6 +125,19 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         val adapter = bluetoothManager?.adapter
         
         if (adapter != null) {
+            // Check for BLUETOOTH_CONNECT permission on API 31+
+            val hasConnectPermission = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                androidx.core.content.ContextCompat.checkSelfPermission(
+                    getApplication(), 
+                    android.Manifest.permission.BLUETOOTH_CONNECT
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            } else true
+
+            if (!hasConnectPermission) {
+                _bluetoothDevices.value = emptyList()
+                return
+            }
+
             try {
                 val pairedDevices = adapter.bondedDevices
                 val devices = pairedDevices.map { device ->
@@ -135,16 +148,16 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         if (level in 0..100) battery = level
                     } catch (e: Exception) {}
 
-                    // Check if connected using hidden method or by checking A2DP profile
-                    // For simplicity in a prototype/build, we'll use a reflection check for isConnected
                     var isConnected = false
                     try {
                         val isConnectedMethod = device.javaClass.getMethod("isConnected")
                         isConnected = isConnectedMethod.invoke(device) as Boolean
                     } catch (e: Exception) {}
 
+                    val deviceName = try { device.name } catch (e: SecurityException) { "Unknown Device" }
+
                     BluetoothDeviceRecord(
-                        name = device.name ?: "Unknown Device",
+                        name = deviceName ?: "Unknown Device",
                         address = device.address,
                         batteryLevel = battery,
                         isConnected = isConnected
@@ -152,6 +165,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 _bluetoothDevices.value = devices
             } catch (e: SecurityException) {
+                e.printStackTrace()
+            } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
