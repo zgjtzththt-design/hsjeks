@@ -172,11 +172,12 @@ class MainActivity : ComponentActivity() {
                         lineHeight = 20.sp
                     )
                     Spacer(modifier = Modifier.height(32.dp))
-                    Button(
+                    val useLiquidButtons by themeViewModel.useLiquidButtons.collectAsState()
+                    MelodyButton(
                         onClick = {
                             launcher.launch(permissions.toTypedArray())
                         },
-                        shape = RoundedCornerShape(14.dp),
+                        useLiquid = useLiquidButtons,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)

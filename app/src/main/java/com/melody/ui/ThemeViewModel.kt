@@ -23,6 +23,9 @@ class ThemeViewModel(application: Application) : AndroidViewModel(application) {
     private val _albumArtShape = MutableStateFlow(prefs.getInt("album_art_shape", 0))
     val albumArtShape: StateFlow<Int> = _albumArtShape
 
+    private val _useLiquidButtons = MutableStateFlow(prefs.getBoolean("use_liquid_buttons", false))
+    val useLiquidButtons: StateFlow<Boolean> = _useLiquidButtons
+
     fun setDynamicColor(enabled: Boolean) {
         _useDynamicColor.value = enabled
         prefs.edit().putBoolean("dynamic_color", enabled).apply()
@@ -41,5 +44,10 @@ class ThemeViewModel(application: Application) : AndroidViewModel(application) {
     fun setAlbumArtShape(index: Int) {
         _albumArtShape.value = index
         prefs.edit().putInt("album_art_shape", index).apply()
+    }
+
+    fun setUseLiquidButtons(enabled: Boolean) {
+        _useLiquidButtons.value = enabled
+        prefs.edit().putBoolean("use_liquid_buttons", enabled).apply()
     }
 }

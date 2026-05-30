@@ -87,7 +87,12 @@ fun WelcomeScreen(
                 }
 
                 val coroutineScope = rememberCoroutineScope()
-                Button(
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val application = context.applicationContext as android.app.Application
+                val themeViewModel = remember { ThemeViewModel(application) }
+                val useLiquidButtons by themeViewModel.useLiquidButtons.collectAsState()
+
+                MelodyButton(
                     onClick = {
                         if (pagerState.currentPage < pages.size - 1) {
                             coroutineScope.launch {
@@ -98,7 +103,7 @@ fun WelcomeScreen(
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(16.dp)
+                    useLiquid = useLiquidButtons
                 ) {
                     Text(
                         text = if (pagerState.currentPage == pages.size - 1) "بدأ" else "تغيير خيارات",

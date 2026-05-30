@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.lazy.LazyColumn
@@ -61,10 +62,17 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.tanh
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.graphics.isSpecified
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.Canvas
@@ -1861,6 +1869,21 @@ fun SettingsScreen(
                     )
                 }
             )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+            SettingsItem(
+                title = "تأثير الأزرار السائل",
+                subtitle = "تفعيل مظهر وتأثير الأزرار الزجاجية السائلة التفاعلية",
+                icon = Icons.Rounded.TouchApp,
+                iconContainerColor = Color(0xFFE91E63).copy(alpha = 0.2f),
+                iconColor = Color(0xFFC2185B),
+                trailing = {
+                    val useLiquidButtons by viewModel.useLiquidButtons.collectAsState()
+                    Switch(
+                        checked = useLiquidButtons,
+                        onCheckedChange = { viewModel.setUseLiquidButtons(it) }
+                    )
+                }
+            )
         }
 
         SettingsGroup(title = "Creative Canvas") {
@@ -2137,30 +2160,193 @@ fun BluetoothBatterySheet(musicViewModel: MusicViewModel, onDismiss: () -> Unit)
             Spacer(modifier = Modifier.height(16.dp))
 
             val context = androidx.compose.ui.platform.LocalContext.current
+            val application = context.applicationContext as android.app.Application
+            val themeViewModel = remember { ThemeViewModel(application) }
+            val useLiquidButtons by themeViewModel.useLiquidButtons.collectAsState()
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                OutlinedButton(
+                MelodyButton(
                     onClick = {
                         val intent = android.content.Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS)
                         context.startActivity(intent)
                     },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
+                    useLiquid = useLiquidButtons
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Pair New")
                 }
 
-                Button(
+                MelodyButton(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
+                    useLiquid = useLiquidButtons,
+                    tint = MaterialTheme.colorScheme.secondary
                 ) {
                     Text("Close")
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun LiquidButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    isInteractive: Boolean = true,
+    tint: Color = Color.Unspecified,
+    surfaceColor: Color = Color.Unspecified,
+    backdrop: Any? = null,
+    content: @Composable RowScope.() -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressedState by interactionSource.collectIsPressedAsState()
+    
+    var touchOffset by remember { mutableStateOf(Offset.Zero) }
+    var isDragging by remember { mutableStateOf(false) }
+    
+    val pressProgress by animateFloatAsState(
+        targetValue = if (isPressedState || isDragging) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "PressProgress"
+    )
+    
+    val animatedOffsetX by animateFloatAsState(
+        targetValue = touchOffset.x,
+        animationSpec = spring(dampingRatio = 0.5f, stiffness = 120f),
+        label = "LiquidDragX"
+    )
+    val animatedOffsetY by animateFloatAsState(
+        targetValue = touchOffset.y,
+        animationSpec = spring(dampingRatio = 0.5f, stiffness = 120f),
+        label = "LiquidDragY"
+    )
+
+    val scale = androidx.compose.ui.util.lerp(1f, 0.94f, pressProgress)
+    val dragAngle = atan2(animatedOffsetY, animatedOffsetX)
+    val dragDist = kotlin.math.hypot(animatedOffsetX, animatedOffsetY)
+    val maxDist = 200f
+    val normalizedDrag = (dragDist / maxDist).coerceIn(0f, 1f)
+    
+    val finalScaleX = scale + (0.12f * abs(cos(dragAngle)) * normalizedDrag * pressProgress)
+    val finalScaleY = scale - (0.06f * abs(sin(dragAngle)) * normalizedDrag * pressProgress)
+    
+    val swayX = (animatedOffsetX * 0.15f).coerceIn(-12f, 12f) * pressProgress
+    val swayY = (animatedOffsetY * 0.15f).coerceIn(-12f, 12f) * pressProgress
+
+    val containerColor = if (surfaceColor.isSpecified) {
+        surfaceColor
+    } else if (tint.isSpecified) {
+        tint.copy(alpha = 0.32f)
+    } else {
+        if (isSystemInDarkTheme()) Color(0xFF2C2C2C).copy(alpha = 0.48f) else Color(0xFFF0F0F0).copy(alpha = 0.65f)
+    }
+
+    val finalBorderColor = if (tint.isSpecified) {
+        tint.copy(alpha = 0.60f)
+    } else {
+        if (isSystemInDarkTheme()) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.12f)
+    }
+
+    Box(
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = finalScaleX
+                scaleY = finalScaleY
+                translationX = swayX
+                translationY = swayY
+            }
+            .pointerInput(Unit) {
+                if (isInteractive) {
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            isDragging = true
+                            touchOffset = offset - Offset(size.width / 2f, size.height / 2f)
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            touchOffset += dragAmount
+                        },
+                        onDragEnd = {
+                            isDragging = false
+                            touchOffset = Offset.Zero
+                        },
+                        onDragCancel = {
+                            isDragging = false
+                            touchOffset = Offset.Zero
+                        }
+                    )
+                }
+            }
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
+            .background(containerColor)
+            .border(
+                width = 1.2.dp,
+                color = finalBorderColor,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = androidx.compose.foundation.LocalIndication.current,
+                onClick = onClick
+            )
+            .height(48.dp)
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val contentColor = if (tint.isSpecified) {
+                tint
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            }
+            CompositionLocalProvider(
+                LocalContentColor provides contentColor
+            ) {
+                content()
+            }
+        }
+    }
+}
+
+@Composable
+fun MelodyButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    useLiquid: Boolean = false,
+    tint: Color = Color.Unspecified,
+    content: @Composable RowScope.() -> Unit
+) {
+    if (useLiquid) {
+        LiquidButton(
+            onClick = onClick,
+            modifier = modifier,
+            tint = if (tint != Color.Unspecified) tint else MaterialTheme.colorScheme.primary,
+            content = content
+        )
+    } else {
+        Button(
+            onClick = onClick,
+            modifier = modifier.height(48.dp),
+            colors = if (tint != Color.Unspecified) ButtonDefaults.buttonColors(containerColor = tint) else ButtonDefaults.buttonColors(),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                content()
             }
         }
     }
