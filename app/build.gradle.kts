@@ -15,7 +15,7 @@ android {
   defaultConfig {
     applicationId = "com.aistudio.melody.music.qwpzrx"
     minSdk = 21
-    targetSdk = 34
+    targetSdk = 35
     versionCode = 1
     versionName = "1.0"
 
@@ -23,22 +23,14 @@ android {
   }
 
   signingConfigs {
-    val releaseKeystoreExists = file(System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks").exists() && System.getenv("STORE_PASSWORD") != null
     create("release") {
       enableV1Signing = true
       enableV2Signing = true
-      if (releaseKeystoreExists) {
-        val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-        storeFile = file(keystorePath)
-        storePassword = System.getenv("STORE_PASSWORD")
-        keyAlias = "upload"
-        keyPassword = System.getenv("KEY_PASSWORD")
-      } else {
-        storeFile = file("${rootDir}/debug.keystore")
-        storePassword = "android"
-        keyAlias = "androiddebugkey"
-        keyPassword = "android"
-      }
+      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
+      storeFile = file(keystorePath)
+      storePassword = System.getenv("STORE_PASSWORD")
+      keyAlias = "upload"
+      keyPassword = System.getenv("KEY_PASSWORD")
     }
     create("debugConfig") {
       enableV1Signing = true
@@ -71,13 +63,6 @@ android {
   buildFeatures {
     compose = true
     buildConfig = true
-  }
-  packaging {
-    resources {
-      excludes += "/META-INF/{AL2.0,LGPL2.1}"
-      excludes += "META-INF/LICENSE.md"
-      excludes += "META-INF/LICENSE-notice.md"
-    }
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
 }
