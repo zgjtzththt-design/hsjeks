@@ -24,7 +24,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.MyApplication"
+        android:theme="@style/Theme.Melody"
         android:name="com.melody.MelodyApp">
         <service
             android:name="com.melody.service.PlaybackService"
@@ -39,7 +39,7 @@
             android:name="com.melody.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.MyApplication">
+            android:theme="@style/Theme.Melody">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

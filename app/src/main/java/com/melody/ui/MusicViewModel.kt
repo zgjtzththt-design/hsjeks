@@ -94,57 +94,86 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
-        val currentSysVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-        _volumeLevel.value = ((currentSysVol.toFloat() / maxSysVolume) * 100).toInt()
+        try {
+            val currentSysVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            val maxVol = if (maxSysVolume > 0) maxSysVolume else 15
+            _volumeLevel.value = ((currentSysVol.toFloat() / maxVol) * 100).toInt()
+        } catch (e: Exception) {
+            _volumeLevel.value = 50
+        }
         loadSongs()
         setupMediaController()
         startProgressUpdate()
         
-        val filter = android.content.IntentFilter().apply {
-            addAction(android.bluetooth.BluetoothDevice.ACTION_ACL_CONNECTED)
-            addAction(android.bluetooth.BluetoothDevice.ACTION_ACL_DISCONNECTED)
-            addAction(android.bluetooth.BluetoothDevice.ACTION_BOND_STATE_CHANGED)
-            addAction("android.bluetooth.device.action.BATTERY_LEVEL_CHANGED")
+        try {
+            val filter = android.content.IntentFilter().apply {
+                addAction(android.bluetooth.BluetoothDevice.ACTION_ACL_CONNECTED)
+                addAction(android.bluetooth.BluetoothDevice.ACTION_ACL_DISCONNECTED)
+                addAction(android.bluetooth.BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+                addAction("android.bluetooth.device.action.BATTERY_LEVEL_CHANGED")
+            }
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                getApplication<Application>().registerReceiver(
+                    bluetoothReceiver, 
+                    filter, 
+                    android.content.Context.RECEIVER_NOT_EXPORTED
+                )
+            } else {
+                getApplication<Application>().registerReceiver(bluetoothReceiver, filter)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-        getApplication<Application>().registerReceiver(bluetoothReceiver, filter)
         
         updateBluetoothDevices()
     }
     
     fun updateBluetoothDevices() {
-        val bluetoothManager = getApplication<Application>().getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
-        val adapter = bluetoothManager?.adapter
-        
-        if (adapter != null) {
-            try {
-                val pairedDevices = adapter.bondedDevices
-                val devices = pairedDevices.map { device ->
-                    var battery: Int? = null
-                    try {
-                        val method = device.javaClass.getMethod("getBatteryLevel")
-                        val level = method.invoke(device) as Int
-                        if (level in 0..100) battery = level
-                    } catch (e: Exception) {}
+        try {
+            val bluetoothManager = getApplication<Application>().getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
+            val adapter = bluetoothManager?.adapter
+            
+            if (adapter != null) {
+                try {
+                    val pairedDevices = adapter.bondedDevices
+                    val devices = pairedDevices?.map { device ->
+                        var battery: Int? = null
+                        try {
+                            val method = device.javaClass.getMethod("getBatteryLevel")
+                            val level = method.invoke(device) as? Int
+                            if (level != null && level in 0..100) battery = level
+                        } catch (e: Exception) {}
 
-                    // Check if connected using hidden method or by checking A2DP profile
-                    // For simplicity in a prototype/build, we'll use a reflection check for isConnected
-                    var isConnected = false
-                    try {
-                        val isConnectedMethod = device.javaClass.getMethod("isConnected")
-                        isConnected = isConnectedMethod.invoke(device) as Boolean
-                    } catch (e: Exception) {}
+                        // Check if connected using hidden method or by checking A2DP profile
+                        // For simplicity in a prototype/build, we'll use a reflection check for isConnected
+                        var isConnected = false
+                        try {
+                            val isConnectedMethod = device.javaClass.getMethod("isConnected")
+                            isConnected = isConnectedMethod.invoke(device) as? Boolean ?: false
+                        } catch (e: Exception) {}
 
-                    BluetoothDeviceRecord(
-                        name = device.name ?: "Unknown Device",
-                        address = device.address,
-                        batteryLevel = battery,
-                        isConnected = isConnected
-                    )
+                        val deviceName = try {
+                            device.name
+                        } catch (e: SecurityException) {
+                            "Unknown Device"
+                        } ?: "Unknown Device"
+
+                        BluetoothDeviceRecord(
+                            name = deviceName,
+                            address = device.address ?: "",
+                            batteryLevel = battery,
+                            isConnected = isConnected
+                        )
+                    } ?: emptyList()
+                    _bluetoothDevices.value = devices
+                } catch (e: SecurityException) {
+                    e.printStackTrace()
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
-                _bluetoothDevices.value = devices
-            } catch (e: SecurityException) {
-                e.printStackTrace()
             }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
     
@@ -217,57 +246,63 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun loadSongs() {
         viewModelScope.launch {
-            val songList = mutableListOf<Song>()
-            val projection = arrayOf(
-                MediaStore.Audio.Media._ID,
-                MediaStore.Audio.Media.TITLE,
-                MediaStore.Audio.Media.ARTIST,
-                MediaStore.Audio.Media.ALBUM,
-                MediaStore.Audio.Media.DURATION,
-                MediaStore.Audio.Media.DATA,
-                MediaStore.Audio.Media.ALBUM_ID
-            )
+            try {
+                val songList = mutableListOf<Song>()
+                val projection = arrayOf(
+                    MediaStore.Audio.Media._ID,
+                    MediaStore.Audio.Media.TITLE,
+                    MediaStore.Audio.Media.ARTIST,
+                    MediaStore.Audio.Media.ALBUM,
+                    MediaStore.Audio.Media.DURATION,
+                    MediaStore.Audio.Media.DATA,
+                    MediaStore.Audio.Media.ALBUM_ID
+                )
 
-            getApplication<Application>().contentResolver.query(
-                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-                projection,
-                "${MediaStore.Audio.Media.IS_MUSIC} != 0",
-                null,
-                null
-            )?.use { cursor ->
-                val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
-                val titleCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
-                val artistCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
-                val albumCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
-                val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
-                val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
-                val albumIdCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
+                getApplication<Application>().contentResolver.query(
+                    MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                    projection,
+                    "${MediaStore.Audio.Media.IS_MUSIC} != 0",
+                    null,
+                    null
+                )?.use { cursor ->
+                    val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+                    val titleCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
+                    val artistCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
+                    val albumCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
+                    val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
+                    val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
+                    val albumIdCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
 
-                while (cursor.moveToNext()) {
-                    val id = cursor.getString(idCol)
-                    val path = cursor.getString(dataCol)
-                    val albumId = cursor.getLong(albumIdCol)
-                    val albumArtUri = ContentUris.withAppendedId(
-                        android.net.Uri.parse("content://media/external/audio/albumart"),
-                        albumId
-                    ).toString()
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getString(idCol)
+                        val path = cursor.getString(dataCol)
+                        val albumId = cursor.getLong(albumIdCol)
+                        val albumArtUri = ContentUris.withAppendedId(
+                            android.net.Uri.parse("content://media/external/audio/albumart"),
+                            albumId
+                        ).toString()
 
-                    songList.add(
-                        Song(
-                            id = id,
-                            title = cursor.getString(titleCol),
-                            artist = cursor.getString(artistCol),
-                            album = cursor.getString(albumCol),
-                            duration = cursor.getLong(durationCol),
-                            path = path,
-                            albumArtUri = albumArtUri,
-                            folderPath = File(path).parent ?: ""
+                        songList.add(
+                            Song(
+                                id = id,
+                                title = cursor.getString(titleCol) ?: "Unknown Title",
+                                artist = cursor.getString(artistCol) ?: "Unknown Artist",
+                                album = cursor.getString(albumCol) ?: "Unknown Album",
+                                duration = cursor.getLong(durationCol),
+                                path = path ?: "",
+                                albumArtUri = albumArtUri,
+                                folderPath = if (path != null) (File(path).parent ?: "") else ""
+                            )
                         )
-                    )
+                    }
                 }
+                _songs.value = songList
+                (getApplication() as MelodyApp).database.musicDao().insertSongs(songList)
+            } catch (e: SecurityException) {
+                e.printStackTrace()
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-            _songs.value = songList
-            (getApplication() as MelodyApp).database.musicDao().insertSongs(songList)
         }
     }
 

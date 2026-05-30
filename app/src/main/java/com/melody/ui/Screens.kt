@@ -38,6 +38,10 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.composed
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.haze
+import dev.chrisbanes.haze.hazeChild
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Download
@@ -265,8 +269,28 @@ fun MainScreen(
 
             val showVolumeBar by musicViewModel.showVolumeBar.collectAsState()
             val volumeLevel by musicViewModel.volumeLevel.collectAsState()
+            
+            val hazeState = remember { dev.chrisbanes.haze.HazeState() }
 
-            Box(modifier = Modifier.fillMaxSize()) {
+            CompositionLocalProvider(LocalHazeState provides if (isGlassEnabled) hazeState else null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (isGlassEnabled) {
+                            Modifier.background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                                        MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f),
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                        MaterialTheme.colorScheme.background
+                                    )
+                                )
+                            )
+                        } else Modifier
+                    )
+            ) {
                 AnimatedContent(
                     targetState = showPlayer && currentSong != null,
                     transitionSpec = {
@@ -298,6 +322,10 @@ fun MainScreen(
                     val context = androidx.compose.ui.platform.LocalContext.current
                     
                     Scaffold(
+                        modifier = Modifier
+                            .then(if (isGlassEnabled) Modifier.haze(hazeState) else Modifier),
+                        containerColor = if (isGlassEnabled) Color.Transparent else MaterialTheme.colorScheme.background,
+                        contentColor = MaterialTheme.colorScheme.onBackground,
                         topBar = {
                             @OptIn(ExperimentalMaterial3Api::class)
                             TopAppBar(
@@ -330,64 +358,130 @@ fun MainScreen(
                                 onClick = { showPlayer = true }
                             )
                         }
-                        NavigationBar(
-                            containerColor = if (isGlassEnabled) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
-                            modifier = if (isGlassEnabled) Modifier.glassEffect(shape = androidx.compose.ui.graphics.RectangleShape) else Modifier,
-                            contentColor = MaterialTheme.colorScheme.onSurface
+                        LiquidBottomTabs(
+                            selectedTabIndex = { pagerState.currentPage },
+                            onTabSelected = { index ->
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(index)
+                                }
+                            },
+                            backdrop = hazeState,
+                            tabsCount = 4,
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                                .navigationBarsPadding()
                         ) {
-                            NavigationBarItem(
-                                selected = pagerState.currentPage == 0,
-                                onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } },
-                                icon = { Icon(if (pagerState.currentPage == 0) Icons.Filled.LibraryMusic else Icons.Outlined.LibraryMusic, contentDescription = "Library") },
-                                label = { Text("Library") },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = MaterialTheme.colorScheme.primary,
-                                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                            LiquidBottomTab(
+                                onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } }
+                            ) {
+                                val isSelected = pagerState.currentPage == 0
+                                val scale by animateFloatAsState(
+                                    targetValue = if (isSelected) 1.15f else 1.0f,
+                                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+                                    label = "tab_scale_0"
                                 )
-                            )
-                            NavigationBarItem(
-                                selected = pagerState.currentPage == 1,
-                                onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } },
-                                icon = { Icon(if (pagerState.currentPage == 1) Icons.Filled.Folder else Icons.Outlined.Folder, contentDescription = "Folders") },
-                                label = { Text("Folders") },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = MaterialTheme.colorScheme.primary,
-                                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                                Icon(
+                                    imageVector = if (isSelected) Icons.Filled.LibraryMusic else Icons.Outlined.LibraryMusic,
+                                    contentDescription = "Library",
+                                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    modifier = Modifier.graphicsLayer {
+                                        scaleX = scale
+                                        scaleY = scale
+                                    }
                                 )
-                            )
-                            NavigationBarItem(
-                                selected = pagerState.currentPage == 2,
-                                onClick = { coroutineScope.launch { pagerState.animateScrollToPage(2) } },
-                                icon = { Icon(if (pagerState.currentPage == 2) Icons.Filled.PlaylistPlay else Icons.Outlined.PlaylistPlay, contentDescription = "Playlists") },
-                                label = { Text("Playlists") },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = MaterialTheme.colorScheme.primary,
-                                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text(
+                                    text = "Library",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                 )
-                            )
-                            NavigationBarItem(
-                                selected = pagerState.currentPage == 3,
-                                onClick = { coroutineScope.launch { pagerState.animateScrollToPage(3) } },
-                                icon = { Icon(if (pagerState.currentPage == 3) Icons.Filled.Settings else Icons.Outlined.Settings, contentDescription = "Settings") },
-                                label = { Text("Settings") },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = MaterialTheme.colorScheme.primary,
-                                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                            }
+                            LiquidBottomTab(
+                                onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } }
+                            ) {
+                                val isSelected = pagerState.currentPage == 1
+                                val scale by animateFloatAsState(
+                                    targetValue = if (isSelected) 1.15f else 1.0f,
+                                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+                                    label = "tab_scale_1"
                                 )
-                            )
+                                Icon(
+                                    imageVector = if (isSelected) Icons.Filled.Folder else Icons.Outlined.Folder,
+                                    contentDescription = "Folders",
+                                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    modifier = Modifier.graphicsLayer {
+                                        scaleX = scale
+                                        scaleY = scale
+                                    }
+                                )
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text(
+                                    text = "Folders",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                            }
+                            LiquidBottomTab(
+                                onClick = { coroutineScope.launch { pagerState.animateScrollToPage(2) } }
+                            ) {
+                                val isSelected = pagerState.currentPage == 2
+                                val scale by animateFloatAsState(
+                                    targetValue = if (isSelected) 1.15f else 1.0f,
+                                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+                                    label = "tab_scale_2"
+                                )
+                                Icon(
+                                    imageVector = if (isSelected) Icons.Filled.PlaylistPlay else Icons.Outlined.PlaylistPlay,
+                                    contentDescription = "Playlists",
+                                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    modifier = Modifier.graphicsLayer {
+                                        scaleX = scale
+                                        scaleY = scale
+                                    }
+                                )
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text(
+                                    text = "Playlists",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                            }
+                            LiquidBottomTab(
+                                onClick = { coroutineScope.launch { pagerState.animateScrollToPage(3) } }
+                            ) {
+                                val isSelected = pagerState.currentPage == 3
+                                val scale by animateFloatAsState(
+                                    targetValue = if (isSelected) 1.15f else 1.0f,
+                                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+                                    label = "tab_scale_3"
+                                )
+                                Icon(
+                                    imageVector = if (isSelected) Icons.Filled.Settings else Icons.Outlined.Settings,
+                                    contentDescription = "Settings",
+                                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    modifier = Modifier.graphicsLayer {
+                                        scaleX = scale
+                                        scaleY = scale
+                                    }
+                                )
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text(
+                                    text = "Settings",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                            }
                         }
                     }
                 }
             ) { paddingValues ->
                 HorizontalPager(
                     state = pagerState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
+                    modifier = Modifier.fillMaxSize()
                 ) { page ->
                     when (page) {
                         0 -> SongList(
@@ -398,15 +492,24 @@ fun MainScreen(
                             artShape = albumArtShape, 
                             isGlassEnabled = isGlassEnabled,
                             bluetoothDevices = bluetoothDevices,
-                            onSongClick = { musicViewModel.playSong(it, filteredSongs) }
+                            onSongClick = { musicViewModel.playSong(it, filteredSongs) },
+                            contentPadding = paddingValues
                         )
-                        1 -> FolderList(songs = songs, useCompact = useCompactLayout)
+                        1 -> FolderList(
+                            songs = songs, 
+                            useCompact = useCompactLayout,
+                            contentPadding = paddingValues
+                        )
                         2 -> PlaylistList(
                             playlists = playlists, 
                             onCreatePlaylist = { musicViewModel.createPlaylist(it) },
-                            onDeletePlaylist = { musicViewModel.deletePlaylist(it) }
+                            onDeletePlaylist = { musicViewModel.deletePlaylist(it) },
+                            contentPadding = paddingValues
                         )
-                        3 -> SettingsScreen(themeViewModel)
+                        3 -> SettingsScreen(
+                            viewModel = themeViewModel,
+                            contentPadding = paddingValues
+                        )
                     }
                 }
             }
@@ -425,6 +528,7 @@ fun MainScreen(
             CustomVolumeBar(volumeLevel)
         }
     } // close Box
+    } // close CompositionLocalProvider
 } // close MainScreen
 
 @Composable
@@ -454,6 +558,7 @@ fun SongList(
     artShape: Shape, 
     isGlassEnabled: Boolean = false,
     bluetoothDevices: List<MusicViewModel.BluetoothDeviceRecord> = emptyList(),
+    contentPadding: PaddingValues = PaddingValues(0.dp),
     onSongClick: (Song) -> Unit
 ) {
     val listState = rememberLazyListState()
@@ -576,7 +681,12 @@ fun SongList(
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
                 state = listState,
-                contentPadding = PaddingValues(bottom = 8.dp, start = 16.dp) // Added start padding for the handle
+                contentPadding = PaddingValues(
+                    bottom = contentPadding.calculateBottomPadding() + 8.dp,
+                    start = 16.dp,
+                    top = contentPadding.calculateTopPadding(),
+                    end = 16.dp
+                )
             ) {
                 items(songs, key = { it.id }) { song ->
                     SongItem(
@@ -675,7 +785,7 @@ fun SongItem(
         color = Color.Transparent,
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (isGlassEnabled) Modifier.glassEffect(alpha = 0.15f, shape = RoundedCornerShape(12.dp)) else Modifier)
+            .then(if (isGlassEnabled) Modifier.liquidGlass(alpha = 0.15f, shape = RoundedCornerShape(12.dp)) else Modifier)
     ) {
         ListItem(
             modifier = Modifier
@@ -723,7 +833,8 @@ fun SongItem(
 fun PlaylistList(
     playlists: List<com.melody.data.Playlist>,
     onCreatePlaylist: (String) -> Unit,
-    onDeletePlaylist: (com.melody.data.Playlist) -> Unit
+    onDeletePlaylist: (com.melody.data.Playlist) -> Unit,
+    contentPadding: PaddingValues = PaddingValues(0.dp)
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
     var playlistName by remember { mutableStateOf("") }
@@ -763,14 +874,26 @@ fun PlaylistList(
         if (playlists.isEmpty()) {
             EmptyState(Icons.Default.PlaylistPlay, "No playlists created yet")
         } else {
-            LazyColumn(contentPadding = PaddingValues(16.dp)) {
+            LazyColumn(
+                contentPadding = PaddingValues(
+                    bottom = contentPadding.calculateBottomPadding() + 16.dp,
+                    top = contentPadding.calculateTopPadding() + 16.dp,
+                    start = 16.dp, 
+                    end = 16.dp
+                )
+            ) {
                 items(playlists, key = { it.id }) { playlist ->
+                    val isGlassEnabled = LocalHazeState.current != null
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
+                            .padding(vertical = 4.dp)
+                            .then(if (isGlassEnabled) Modifier.liquidGlass(shape = MaterialTheme.shapes.large) else Modifier),
                         shape = MaterialTheme.shapes.large,
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isGlassEnabled) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
                     ) {
                         ListItem(
                             headlineContent = { Text(playlist.name, fontWeight = FontWeight.Bold) },
@@ -1417,23 +1540,36 @@ fun PlaceholderArt() {
 }
 
 @Composable
-fun FolderList(songs: List<Song>, useCompact: Boolean) {
+fun FolderList(
+    songs: List<Song>, 
+    useCompact: Boolean,
+    contentPadding: PaddingValues = PaddingValues(0.dp)
+) {
     val folders = remember(songs) { songs.groupBy { it.folderPath } }
     val shape = MaterialTheme.shapes.extraLarge
     
     LazyColumn(
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(
+            bottom = contentPadding.calculateBottomPadding() + 16.dp,
+            top = contentPadding.calculateTopPadding() + 16.dp,
+            start = 16.dp, 
+            end = 16.dp
+        ),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         folders.forEach { (path, folderSongs) ->
             item(key = path) {
+                val isGlassEnabled = LocalHazeState.current != null
                 Card(
                     onClick = { /* Folder detail browsing */ },
                     shape = shape,
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                        containerColor = if (isGlassEnabled) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.onSurface
                     ),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(if (isGlassEnabled) Modifier.liquidGlass(shape = shape) else Modifier)
                 ) {
                     ListItem(
                         headlineContent = { 
@@ -1486,12 +1622,13 @@ fun MiniPlayer(
     )
 
     Surface(
-        color = if (isGlassEnabled) MaterialTheme.colorScheme.surface.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = if (isGlassEnabled) 2.dp else 4.dp,
+        color = if (isGlassEnabled) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = if (isGlassEnabled) 0.dp else 4.dp,
         modifier = Modifier
             .padding(horizontal = 12.dp, vertical = 6.dp)
             .clip(MaterialTheme.shapes.extraLarge)
-            .then(if (isGlassEnabled) Modifier.glassEffect(shape = MaterialTheme.shapes.extraLarge) else Modifier)
+            .then(if (isGlassEnabled) Modifier.liquidGlass(shape = MaterialTheme.shapes.extraLarge) else Modifier)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -1552,6 +1689,67 @@ fun MiniPlayer(
                 )
             }
         }
+    }
+}
+
+val LocalHazeState = compositionLocalOf<dev.chrisbanes.haze.HazeState?> { null }
+
+fun Modifier.liquidGlass(
+    alpha: Float = 0.15f,
+    shape: Shape = RoundedCornerShape(28.dp)
+): Modifier = composed {
+    val hazeState = LocalHazeState.current
+    if (hazeState != null) {
+        this.then(
+            Modifier
+                .clip(shape)
+                .hazeChild(state = hazeState, shape = shape)
+                .background(
+                    color = Color.White.copy(alpha = 0.05f),
+                    shape = shape
+                )
+                .border(
+                    width = 1.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.25f),
+                            Color.White.copy(alpha = 0.03f),
+                            Color.White.copy(alpha = 0.15f),
+                            Color.Transparent
+                        )
+                    ),
+                    shape = shape
+                )
+        )
+    } else {
+        this.then(
+            Modifier
+                .clip(shape)
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = alpha * 3f),
+                            Color.White.copy(alpha = alpha * 1.5f),
+                            Color.White.copy(alpha = alpha * 0.5f)
+                        ),
+                        start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                        end = androidx.compose.ui.geometry.Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                    ),
+                    shape = shape
+                )
+                .border(
+                    width = 1.5.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.6f),
+                            Color.White.copy(alpha = 0.1f),
+                            Color.White.copy(alpha = 0.4f),
+                            Color.Transparent
+                        )
+                    ),
+                    shape = shape
+                )
+        )
     }
 }
 
@@ -1665,6 +1863,7 @@ fun SettingsItem(
 
 @Composable
 fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
+    val isGlassEnabled = LocalHazeState.current != null
     Column(modifier = Modifier.padding(bottom = 24.dp)) {
         Text(
             text = title.uppercase(),
@@ -1676,11 +1875,13 @@ fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
         )
         Surface(
             shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            tonalElevation = 1.dp,
+            color = if (isGlassEnabled) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            tonalElevation = if (isGlassEnabled) 0.dp else 1.dp,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp)
+                .then(if (isGlassEnabled) Modifier.liquidGlass(shape = RoundedCornerShape(28.dp)) else Modifier)
         ) {
             Column {
                 content()
@@ -1691,7 +1892,10 @@ fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun SettingsScreen(viewModel: ThemeViewModel) {
+fun SettingsScreen(
+    viewModel: ThemeViewModel,
+    contentPadding: PaddingValues = PaddingValues(0.dp)
+) {
     val dynamicColor by viewModel.useDynamicColor.collectAsState()
     val primaryColor by viewModel.primaryColor.collectAsState()
     val isGlassEnabled by viewModel.isGlassEffectEnabled.collectAsState()
@@ -1701,8 +1905,12 @@ fun SettingsScreen(viewModel: ThemeViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .padding(top = contentPadding.calculateTopPadding())
             .verticalScroll(rememberScrollState())
-            .padding(top = 16.dp, bottom = 32.dp)
+            .padding(
+                top = 16.dp, 
+                bottom = contentPadding.calculateBottomPadding() + 32.dp
+            )
     ) {
         SettingsGroup(title = "Visual Essence") {
             SettingsItem(
@@ -1715,22 +1923,6 @@ fun SettingsScreen(viewModel: ThemeViewModel) {
                     Switch(
                         checked = dynamicColor,
                         onCheckedChange = { viewModel.setDynamicColor(it) }
-                    )
-                }
-            )
-            
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-
-            SettingsItem(
-                title = "Liquid Glass",
-                subtitle = "Vibrant transparency & blur",
-                icon = Icons.Rounded.BlurOn,
-                iconContainerColor = Color(0xFF2196F3).copy(alpha = 0.2f),
-                iconColor = Color(0xFF1976D2),
-                trailing = {
-                    Switch(
-                        checked = isGlassEnabled,
-                        onCheckedChange = { viewModel.setGlassEffectEnabled(it) }
                     )
                 }
             )
@@ -2054,3 +2246,107 @@ fun BluetoothBatterySheet(musicViewModel: MusicViewModel, onDismiss: () -> Unit)
         }
     }
 }
+
+@Composable
+fun LiquidBottomTabs(
+    selectedTabIndex: () -> Int,
+    onTabSelected: (Int) -> Unit,
+    backdrop: Any? = null,
+    tabsCount: Int,
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit
+) {
+    val isGlassEnabled = true // Ensure liquid Glass is beautifully displayed using dynamic options
+    
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(68.dp)
+            .then(
+                if (isGlassEnabled) {
+                    Modifier.liquidGlass(shape = RoundedCornerShape(32.dp))
+                } else {
+                    Modifier.background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(32.dp))
+                }
+            )
+    ) {
+        val selectedIndex = selectedTabIndex()
+        
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val containerWidth = maxWidth
+            val tabWidth = containerWidth / tabsCount
+            
+            val animatedOffset by animateDpAsState(
+                targetValue = tabWidth * selectedIndex,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                ),
+                label = "LiquidIndicatorOffset"
+            )
+            
+            // Slider / Glowing Indicator Pill behind the active item
+            Box(
+                modifier = Modifier
+                    .offset(x = animatedOffset)
+                    .width(tabWidth)
+                    .fillMaxHeight()
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                            )
+                        ),
+                        shape = RoundedCornerShape(26.dp)
+                    )
+                    .border(
+                        width = 1.2.dp,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                            )
+                        ),
+                        shape = RoundedCornerShape(26.dp)
+                    )
+            )
+        }
+        
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            content()
+        }
+    }
+}
+
+@Composable
+fun RowScope.LiquidBottomTab(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Box(
+        modifier = modifier
+            .weight(1f)
+            .fillMaxHeight()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            content()
+        }
+    }
+}
+
