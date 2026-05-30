@@ -14,8 +14,8 @@ android {
 
   defaultConfig {
     applicationId = "com.aistudio.melody.music.qwpzrx"
-    minSdk = 24
-    targetSdk = 35
+    minSdk = 21
+    targetSdk = 34
     versionCode = 1
     versionName = "1.0"
 
@@ -25,6 +25,8 @@ android {
   signingConfigs {
     val releaseKeystoreExists = file(System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks").exists() && System.getenv("STORE_PASSWORD") != null
     create("release") {
+      enableV1Signing = true
+      enableV2Signing = true
       if (releaseKeystoreExists) {
         val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
         storeFile = file(keystorePath)
@@ -39,6 +41,8 @@ android {
       }
     }
     create("debugConfig") {
+      enableV1Signing = true
+      enableV2Signing = true
       storeFile = file("${rootDir}/debug.keystore")
       storePassword = "android"
       keyAlias = "androiddebugkey"
