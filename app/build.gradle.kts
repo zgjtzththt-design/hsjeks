@@ -10,12 +10,12 @@ plugins {
 
 android {
   namespace = "com.melody"
-  compileSdk = 35
+  compileSdk = 36
 
   defaultConfig {
     applicationId = "com.aistudio.melody.music.qwpzrx"
-    minSdk = 21
-    targetSdk = 35
+    minSdk = 24
+    targetSdk = 36
     versionCode = 1
     versionName = "1.0"
 
@@ -92,7 +92,6 @@ dependencies {
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.core.ktx)
-  implementation("dev.chrisbanes.haze:haze:0.7.3")
   implementation(libs.androidx.datastore.preferences)
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.runtime.ktx)

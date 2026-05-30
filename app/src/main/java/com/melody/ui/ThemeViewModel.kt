@@ -20,9 +20,6 @@ class ThemeViewModel(application: Application) : AndroidViewModel(application) {
     private val _useCompactLayout = MutableStateFlow(prefs.getBoolean("compact_layout", false))
     val useCompactLayout: StateFlow<Boolean> = _useCompactLayout
 
-    private val _isGlassEffectEnabled = MutableStateFlow(prefs.getBoolean("glass_effect", false))
-    val isGlassEffectEnabled: StateFlow<Boolean> = _isGlassEffectEnabled
-
     private val _albumArtShape = MutableStateFlow(prefs.getInt("album_art_shape", 0))
     val albumArtShape: StateFlow<Int> = _albumArtShape
 
@@ -39,11 +36,6 @@ class ThemeViewModel(application: Application) : AndroidViewModel(application) {
     fun setCompactLayout(enabled: Boolean) {
         _useCompactLayout.value = enabled
         prefs.edit().putBoolean("compact_layout", enabled).apply()
-    }
-
-    fun setGlassEffectEnabled(enabled: Boolean) {
-        _isGlassEffectEnabled.value = enabled
-        prefs.edit().putBoolean("glass_effect", enabled).apply()
     }
 
     fun setAlbumArtShape(index: Int) {

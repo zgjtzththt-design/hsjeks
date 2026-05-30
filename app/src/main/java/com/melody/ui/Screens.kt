@@ -39,9 +39,6 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.composed
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.haze
-import dev.chrisbanes.haze.hazeChild
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Download
@@ -242,7 +239,6 @@ fun MainScreen(
     val currentSong by musicViewModel.currentSong.collectAsState()
     val isPlaying by musicViewModel.isPlaying.collectAsState()
     val useCompactLayout by themeViewModel.useCompactLayout.collectAsState()
-    val isGlassEnabled = true
     val albumArtShapeIndex by themeViewModel.albumArtShape.collectAsState()
 
     val albumArtShape = remember(albumArtShapeIndex) { AlbumArtShapes.getOrElse(albumArtShapeIndex) { AlbumArtShapes[0] } }
@@ -264,32 +260,15 @@ fun MainScreen(
                 CastBottomSheet(onDismiss = { showCastSheet = false })
             }
 
-            val pagerState = rememberPagerState(pageCount = { 4 })
+            val pagerState = rememberPagerState(pageCount = { 3 })
             val coroutineScope = rememberCoroutineScope()
 
             val showVolumeBar by musicViewModel.showVolumeBar.collectAsState()
             val volumeLevel by musicViewModel.volumeLevel.collectAsState()
             
-            val hazeState = remember { dev.chrisbanes.haze.HazeState() }
-
-            CompositionLocalProvider(LocalHazeState provides if (isGlassEnabled) hazeState else null) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(
-                        if (isGlassEnabled) {
-                            Modifier.background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
-                                        MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f),
-                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                        MaterialTheme.colorScheme.background
-                                    )
-                                )
-                            )
-                        } else Modifier
-                    )
             ) {
                 AnimatedContent(
                     targetState = showPlayer && currentSong != null,
@@ -322,9 +301,8 @@ fun MainScreen(
                     val context = androidx.compose.ui.platform.LocalContext.current
                     
                     Scaffold(
-                        modifier = Modifier
-                            .then(if (isGlassEnabled) Modifier.haze(hazeState) else Modifier),
-                        containerColor = if (isGlassEnabled) Color.Transparent else MaterialTheme.colorScheme.background,
+                        modifier = Modifier,
+                        containerColor = MaterialTheme.colorScheme.background,
                         contentColor = MaterialTheme.colorScheme.onBackground,
                         topBar = {
                             @OptIn(ExperimentalMaterial3Api::class)
@@ -353,39 +331,150 @@ fun MainScreen(
                                 song = currentSong!!,
                                 isPlaying = isPlaying,
                                 albumArtShape = albumArtShape,
-                                isGlassEnabled = isGlassEnabled,
                                 onTogglePlayback = { musicViewModel.togglePlayback() },
                                 onClick = { showPlayer = true }
                             )
                         }
-                        NavigationBar(
-                            containerColor = if (isGlassEnabled) Color.Transparent else MaterialTheme.colorScheme.surface,
-                            modifier = Modifier.then(if (isGlassEnabled) Modifier.hazeChild(hazeState) else Modifier)
+                        val tabShape = androidx.compose.foundation.shape.RoundedCornerShape(32.dp)
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .navigationBarsPadding()
+                                .padding(start = 24.dp, end = 24.dp, bottom = 20.dp, top = 8.dp)
+                                .height(64.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    shape = tabShape
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                    shape = tabShape
+                                )
                         ) {
-                            NavigationBarItem(
-                                selected = pagerState.currentPage == 0,
-                                onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } },
-                                icon = { Icon(if (pagerState.currentPage == 0) Icons.Filled.LibraryMusic else Icons.Outlined.LibraryMusic, contentDescription = "Library") },
-                                label = { Text("Library") }
-                            )
-                            NavigationBarItem(
-                                selected = pagerState.currentPage == 1,
-                                onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } },
-                                icon = { Icon(if (pagerState.currentPage == 1) Icons.Filled.Folder else Icons.Outlined.Folder, contentDescription = "Folders") },
-                                label = { Text("Folders") }
-                            )
-                            NavigationBarItem(
-                                selected = pagerState.currentPage == 2,
-                                onClick = { coroutineScope.launch { pagerState.animateScrollToPage(2) } },
-                                icon = { Icon(if (pagerState.currentPage == 2) Icons.Filled.PlaylistPlay else Icons.Outlined.PlaylistPlay, contentDescription = "Playlists") },
-                                label = { Text("Playlists") }
-                            )
-                            NavigationBarItem(
-                                selected = pagerState.currentPage == 3,
-                                onClick = { coroutineScope.launch { pagerState.animateScrollToPage(3) } },
-                                icon = { Icon(if (pagerState.currentPage == 3) Icons.Filled.Settings else Icons.Outlined.Settings, contentDescription = "Settings") },
-                                label = { Text("Settings") }
-                            )
+                            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                                val barWidth = maxWidth
+                                val tabCount = 3
+                                val tabWidth = barWidth / tabCount
+
+                                val targetFraction by remember {
+                                    derivedStateOf { pagerState.currentPage.toFloat() }
+                                }
+                                val animatedFraction by animateFloatAsState(
+                                    targetValue = targetFraction,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioLowBouncy,
+                                        stiffness = Spring.StiffnessMediumLow
+                                    ),
+                                    label = "LiquidTabIndicator"
+                                )
+
+                                val diff = abs(targetFraction - animatedFraction)
+                                val scaleXFactor = 1f + (diff * 0.22f).coerceIn(0f, 0.35f)
+                                val scaleYFactor = 1f - (diff * 0.08f).coerceIn(0f, 0.15f)
+
+                                Box(
+                                    modifier = Modifier
+                                        .offset(
+                                            x = tabWidth * animatedFraction + (tabWidth * (1f - scaleXFactor) / 2f)
+                                        )
+                                        .width(tabWidth * scaleXFactor)
+                                        .fillMaxHeight()
+                                        .padding(vertical = 6.dp, horizontal = 12.dp)
+                                        .graphicsLayer {
+                                            scaleY = scaleYFactor
+                                        }
+                                        .background(
+                                            brush = Brush.horizontalGradient(
+                                                colors = listOf(
+                                                    MaterialTheme.colorScheme.primary,
+                                                    MaterialTheme.colorScheme.secondary
+                                                )
+                                            ),
+                                            shape = RoundedCornerShape(24.dp)
+                                        )
+                                )
+
+                                Row(
+                                    modifier = Modifier.fillMaxSize(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    val tabsList = listOf(
+                                        0 to ("Library" to Icons.Filled.LibraryMusic to Icons.Outlined.LibraryMusic),
+                                        1 to ("Folders" to Icons.Filled.Folder to Icons.Outlined.Folder),
+                                        2 to ("Settings" to Icons.Filled.Settings to Icons.Outlined.Settings)
+                                    )
+                                    tabsList.forEach { (page, info) ->
+                                        val (textAndIcons, inactiveIcon) = info
+                                        val (label, activeIcon) = textAndIcons
+                                        val isSelected = pagerState.currentPage == page
+
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxHeight()
+                                                .clickable(
+                                                    interactionSource = remember { MutableInteractionSource() },
+                                                    indication = null
+                                                ) {
+                                                    coroutineScope.launch {
+                                                        pagerState.animateScrollToPage(page)
+                                                    }
+                                                }
+                                                .testTag("nav_tab_${label.lowercase()}"),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.Center,
+                                                modifier = Modifier.padding(horizontal = 4.dp)
+                                            ) {
+                                                val iconScale by animateFloatAsState(
+                                                    targetValue = if (isSelected) 1.2f else 1.0f,
+                                                    animationSpec = spring(
+                                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                        stiffness = Spring.StiffnessMedium
+                                                    ),
+                                                    label = "IconScale"
+                                                )
+                                                Icon(
+                                                    imageVector = if (isSelected) activeIcon else inactiveIcon,
+                                                    contentDescription = label,
+                                                    tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
+                                                    modifier = Modifier
+                                                        .size(24.dp)
+                                                        .graphicsLayer {
+                                                            scaleX = iconScale
+                                                            scaleY = iconScale
+                                                        }
+                                                )
+                                                
+                                                AnimatedVisibility(
+                                                    visible = isSelected,
+                                                    enter = expandHorizontally(
+                                                        expandFrom = Alignment.End,
+                                                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                                                    ) + fadeIn(animationSpec = tween(150)),
+                                                    exit = shrinkHorizontally(
+                                                        shrinkTowards = Alignment.End,
+                                                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                                                    ) + fadeOut(animationSpec = tween(150))
+                                                ) {
+                                                    Text(
+                                                        text = label,
+                                                        color = MaterialTheme.colorScheme.onPrimary,
+                                                        style = MaterialTheme.typography.labelLarge.copy(
+                                                            fontWeight = FontWeight.Bold,
+                                                            letterSpacing = 0.5.sp
+                                                        ),
+                                                        modifier = Modifier.padding(start = 8.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -401,7 +490,6 @@ fun MainScreen(
                             onSearchQueryChange = { musicViewModel.setSearchQuery(it) },
                             useCompact = useCompactLayout, 
                             artShape = albumArtShape, 
-                            isGlassEnabled = isGlassEnabled,
                             bluetoothDevices = bluetoothDevices,
                             onSongClick = { musicViewModel.playSong(it, filteredSongs) },
                             contentPadding = paddingValues
@@ -411,13 +499,7 @@ fun MainScreen(
                             useCompact = useCompactLayout,
                             contentPadding = paddingValues
                         )
-                        2 -> PlaylistList(
-                            playlists = playlists, 
-                            onCreatePlaylist = { musicViewModel.createPlaylist(it) },
-                            onDeletePlaylist = { musicViewModel.deletePlaylist(it) },
-                            contentPadding = paddingValues
-                        )
-                        3 -> SettingsScreen(
+                        2 -> SettingsScreen(
                             viewModel = themeViewModel,
                             contentPadding = paddingValues
                         )
@@ -439,7 +521,6 @@ fun MainScreen(
             CustomVolumeBar(volumeLevel)
         }
     } // close Box
-    } // close CompositionLocalProvider
 } // close MainScreen
 
 @Composable
@@ -467,7 +548,6 @@ fun SongList(
     onSearchQueryChange: (String) -> Unit,
     useCompact: Boolean, 
     artShape: Shape, 
-    isGlassEnabled: Boolean = false,
     bluetoothDevices: List<MusicViewModel.BluetoothDeviceRecord> = emptyList(),
     contentPadding: PaddingValues = PaddingValues(0.dp),
     onSongClick: (Song) -> Unit
@@ -604,7 +684,6 @@ fun SongList(
                         song = song, 
                         isCompact = useCompact, 
                         artShape = artShape, 
-                        isGlassEnabled = isGlassEnabled,
                         onClick = { onSongClick(song) }
                     )
                 }
@@ -677,7 +756,6 @@ fun SongItem(
     song: Song, 
     isCompact: Boolean, 
     artShape: Shape, 
-    isGlassEnabled: Boolean = false,
     onClick: () -> Unit
 ) {
     val imageSize = if (isCompact) 40.dp else 56.dp
@@ -696,7 +774,6 @@ fun SongItem(
         color = Color.Transparent,
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (isGlassEnabled) Modifier.liquidGlass(alpha = 0.15f, shape = RoundedCornerShape(12.dp)) else Modifier)
     ) {
         ListItem(
             modifier = Modifier
@@ -794,15 +871,13 @@ fun PlaylistList(
                 )
             ) {
                 items(playlists, key = { it.id }) { playlist ->
-                    val isGlassEnabled = LocalHazeState.current != null
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .then(if (isGlassEnabled) Modifier.liquidGlass(shape = MaterialTheme.shapes.large) else Modifier),
+                            .padding(vertical = 4.dp),
                         shape = MaterialTheme.shapes.large,
                         colors = CardDefaults.cardColors(
-                            containerColor = if (isGlassEnabled) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                             contentColor = MaterialTheme.colorScheme.onSurface
                         )
                     ) {
@@ -1470,17 +1545,15 @@ fun FolderList(
     ) {
         folders.forEach { (path, folderSongs) ->
             item(key = path) {
-                val isGlassEnabled = LocalHazeState.current != null
                 Card(
                     onClick = { /* Folder detail browsing */ },
                     shape = shape,
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isGlassEnabled) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                         contentColor = MaterialTheme.colorScheme.onSurface
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .then(if (isGlassEnabled) Modifier.liquidGlass(shape = shape) else Modifier)
                 ) {
                     ListItem(
                         headlineContent = { 
@@ -1520,7 +1593,6 @@ fun MiniPlayer(
     song: Song,
     isPlaying: Boolean,
     albumArtShape: Shape,
-    isGlassEnabled: Boolean = false,
     onTogglePlayback: () -> Unit,
     onClick: () -> Unit
 ) {
@@ -1533,13 +1605,12 @@ fun MiniPlayer(
     )
 
     Surface(
-        color = if (isGlassEnabled) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = if (isGlassEnabled) 0.dp else 4.dp,
+        tonalElevation = 4.dp,
         modifier = Modifier
             .padding(horizontal = 12.dp, vertical = 6.dp)
             .clip(MaterialTheme.shapes.extraLarge)
-            .then(if (isGlassEnabled) Modifier.liquidGlass(shape = MaterialTheme.shapes.extraLarge) else Modifier)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -1603,66 +1674,6 @@ fun MiniPlayer(
     }
 }
 
-val LocalHazeState = compositionLocalOf<dev.chrisbanes.haze.HazeState?> { null }
-
-fun Modifier.liquidGlass(
-    alpha: Float = 0.15f,
-    shape: Shape = RoundedCornerShape(28.dp)
-): Modifier = composed {
-    val hazeState = LocalHazeState.current
-    if (hazeState != null) {
-        this.then(
-            Modifier
-                .clip(shape)
-                .hazeChild(state = hazeState, shape = shape)
-                .background(
-                    color = Color.White.copy(alpha = 0.05f),
-                    shape = shape
-                )
-                .border(
-                    width = 1.dp,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.25f),
-                            Color.White.copy(alpha = 0.03f),
-                            Color.White.copy(alpha = 0.15f),
-                            Color.Transparent
-                        )
-                    ),
-                    shape = shape
-                )
-        )
-    } else {
-        this.then(
-            Modifier
-                .clip(shape)
-                .background(
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = alpha * 3f),
-                            Color.White.copy(alpha = alpha * 1.5f),
-                            Color.White.copy(alpha = alpha * 0.5f)
-                        ),
-                        start = androidx.compose.ui.geometry.Offset(0f, 0f),
-                        end = androidx.compose.ui.geometry.Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
-                    ),
-                    shape = shape
-                )
-                .border(
-                    width = 1.5.dp,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.6f),
-                            Color.White.copy(alpha = 0.1f),
-                            Color.White.copy(alpha = 0.4f),
-                            Color.Transparent
-                        )
-                    ),
-                    shape = shape
-                )
-        )
-    }
-}
 
 fun Modifier.glassEffect(
     alpha: Float = 0.05f,
@@ -1774,7 +1785,6 @@ fun SettingsItem(
 
 @Composable
 fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
-    val isGlassEnabled = LocalHazeState.current != null
     Column(modifier = Modifier.padding(bottom = 24.dp)) {
         Text(
             text = title.uppercase(),
@@ -1786,13 +1796,12 @@ fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
         )
         Surface(
             shape = RoundedCornerShape(28.dp),
-            color = if (isGlassEnabled) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerLow,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = if (isGlassEnabled) 0.dp else 1.dp,
+            tonalElevation = 1.dp,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp)
-                .then(if (isGlassEnabled) Modifier.liquidGlass(shape = RoundedCornerShape(28.dp)) else Modifier)
         ) {
             Column {
                 content()
@@ -1809,7 +1818,6 @@ fun SettingsScreen(
 ) {
     val dynamicColor by viewModel.useDynamicColor.collectAsState()
     val primaryColor by viewModel.primaryColor.collectAsState()
-    val isGlassEnabled by viewModel.isGlassEffectEnabled.collectAsState()
     val useCompactLayout by viewModel.useCompactLayout.collectAsState()
     val albumArtShapeIndex by viewModel.albumArtShape.collectAsState()
 

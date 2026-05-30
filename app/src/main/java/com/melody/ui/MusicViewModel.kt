@@ -261,7 +261,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 getApplication<Application>().contentResolver.query(
                     MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                     projection,
-                    "${MediaStore.Audio.Media.IS_MUSIC} != 0",
+                    "${MediaStore.Audio.Media.MIME_TYPE} LIKE 'audio/%'",
                     null,
                     null
                 )?.use { cursor ->
