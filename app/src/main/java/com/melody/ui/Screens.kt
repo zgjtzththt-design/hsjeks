@@ -1642,118 +1642,114 @@ fun FolderList(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-        ) {
-            TextField(
-                value = searchQuery,
-                onValueChange = onSearchQueryChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                placeholder = { Text("Search folders...", style = MaterialTheme.typography.bodyMedium) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { onSearchQueryChange("") }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(18.dp))
-                        }
-                    }
-                },
-                singleLine = true,
-                textStyle = MaterialTheme.typography.bodyMedium,
-                shape = RoundedCornerShape(16.dp),
-                colors = TextFieldDefaults.colors(
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    disabledIndicatorColor = Color.Transparent,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                .fillMaxSize()
+                .padding(horizontal = if (customBackgroundPath != null) 12.dp else 0.dp, vertical = if (customBackgroundPath != null) 8.dp else 0.dp)
+                .background(
+                    color = containerBgColor,
+                    shape = RoundedCornerShape(24.dp)
                 )
-            )
-        }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = if (customBackgroundPath != null) 12.dp else 0.dp, vertical = if (customBackgroundPath != null) 8.dp else 0.dp)
-            .background(
-                color = containerBgColor,
-                shape = RoundedCornerShape(24.dp)
-            )
-            .then(
-                if (customBackgroundPath != null) {
-                    Modifier.border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                        shape = RoundedCornerShape(24.dp)
-                    )
-                } else {
-                    Modifier
-                }
-            )
-    ) {
-        LazyColumn(
-            contentPadding = PaddingValues(
-                bottom = contentPadding.calculateBottomPadding() + 16.dp,
-                top = if (customBackgroundPath != null) 16.dp else contentPadding.calculateTopPadding(),
-                start = 16.dp, 
-                end = 16.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .then(
+                    if (customBackgroundPath != null) {
+                        Modifier.border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                            shape = RoundedCornerShape(24.dp)
+                        )
+                    } else {
+                        Modifier
+                    }
+                )
         ) {
-            folders.forEach { (path, folderSongs) ->
-                item(key = path) {
-                    Card(
-                        onClick = { /* Folder detail browsing */ },
-                        shape = shape,
-                        colors = CardDefaults.cardColors(
-                            containerColor = cardBgColor,
-                            contentColor = MaterialTheme.colorScheme.onSurface
-                        ),
+            LazyColumn(
+                contentPadding = PaddingValues(
+                    bottom = contentPadding.calculateBottomPadding() + 16.dp,
+                    top = if (customBackgroundPath != null) 32.dp else contentPadding.calculateTopPadding() + 16.dp,
+                    start = 16.dp, 
+                    end = 16.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    TextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = (2.dp * listSizing))
-                    ) {
-                        ListItem(
-                            headlineContent = { 
-                                Text(
-                                    path.substringAfterLast("/"), 
-                                    fontWeight = FontWeight.Bold,
-                                    style = (if (useCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge).copy(
-                                        fontSize = (if (useCompact) 14.sp else 16.sp) * listSizing
-                                    )
-                                ) 
-                            },
-                            supportingContent = { 
-                                Text(
-                                    "${folderSongs.size} songs • $path", 
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        fontSize = 12.sp * listSizing
-                                    )
-                                ) 
-                            },
-                            leadingContent = { 
-                                Surface(
-                                    shape = MaterialTheme.shapes.medium,
-                                    color = MaterialTheme.colorScheme.primaryContainer,
-                                    modifier = Modifier.size((if (useCompact) 40.dp else 48.dp) * listSizing)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            Icons.Default.Folder, 
-                                            contentDescription = null, 
-                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                            modifier = Modifier.size((if (useCompact) 20.dp else 24.dp) * listSizing)
-                                        )
-                                    }
+                            .height(52.dp),
+                        placeholder = { Text("Search folders...", style = MaterialTheme.typography.bodyMedium) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { onSearchQueryChange("") }) {
+                                    Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(18.dp))
                                 }
-                            },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            }
+                        },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium,
+                        shape = RoundedCornerShape(16.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            disabledIndicatorColor = Color.Transparent,
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                         )
+                    )
+                }
+
+                folders.forEach { (path, folderSongs) ->
+                    item(key = path) {
+                        Card(
+                            onClick = { /* Folder detail browsing */ },
+                            shape = shape,
+                            colors = CardDefaults.cardColors(
+                                containerColor = cardBgColor,
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = (2.dp * listSizing))
+                        ) {
+                            ListItem(
+                                headlineContent = { 
+                                    Text(
+                                        path.substringAfterLast("/"), 
+                                        fontWeight = FontWeight.Bold,
+                                        style = (if (useCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge).copy(
+                                            fontSize = (if (useCompact) 14.sp else 16.sp) * listSizing
+                                        )
+                                    ) 
+                                },
+                                supportingContent = { 
+                                    Text(
+                                        "${folderSongs.size} songs • $path", 
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontSize = 12.sp * listSizing
+                                        )
+                                    ) 
+                                },
+                                leadingContent = { 
+                                    Surface(
+                                        shape = MaterialTheme.shapes.medium,
+                                        color = MaterialTheme.colorScheme.primaryContainer,
+                                        modifier = Modifier.size((if (useCompact) 40.dp else 48.dp) * listSizing)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                Icons.Default.Folder, 
+                                                contentDescription = null, 
+                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                modifier = Modifier.size((if (useCompact) 20.dp else 24.dp) * listSizing)
+                                            )
+                                        }
+                                    }
+                                },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
+                        }
                     }
                 }
             }
@@ -2061,6 +2057,14 @@ fun SettingsScreen(
                     value = listOpacity,
                     onValueChange = { viewModel.setListOpacity(it) },
                     valueRange = 0.1f..1.0f
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                val fontSizeScale by viewModel.fontSizeScale.collectAsState()
+                Text("Font Size: ${(fontSizeScale * 100).toInt()}%", style = MaterialTheme.typography.titleSmall)
+                Slider(
+                    value = fontSizeScale,
+                    onValueChange = { viewModel.setFontSizeScale(it) },
+                    valueRange = 0.8f..1.5f
                 )
             }
 

@@ -33,6 +33,9 @@ class ThemeViewModel(application: Application) : AndroidViewModel(application) {
     private val _listOpacity = MutableStateFlow(prefs.getFloat("list_opacity", 0.8f))
     val listOpacity: StateFlow<Float> = _listOpacity
 
+    private val _fontSizeScale = MutableStateFlow(prefs.getFloat("font_size_scale", 1.0f))
+    val fontSizeScale: StateFlow<Float> = _fontSizeScale
+
     private val _customBackgroundPath = MutableStateFlow(prefs.getString("custom_background_path", null))
     val customBackgroundPath: StateFlow<String?> = _customBackgroundPath
 
@@ -72,6 +75,11 @@ class ThemeViewModel(application: Application) : AndroidViewModel(application) {
     fun setListOpacity(value: Float) {
         _listOpacity.value = value
         prefs.edit().putFloat("list_opacity", value).apply()
+    }
+
+    fun setFontSizeScale(value: Float) {
+        _fontSizeScale.value = value
+        prefs.edit().putFloat("font_size_scale", value).apply()
     }
 
     fun importFont(uri: android.net.Uri, context: Context): Boolean {

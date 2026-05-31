@@ -39,6 +39,7 @@ fun MelodyTheme(
   dynamicColor: Boolean = true,
   customColor: androidx.compose.ui.graphics.Color? = null,
   customFontPath: String? = null,
+  fontSizeScale: Float = 1.0f,
   content: @Composable () -> Unit,
 ) {
   val context = LocalContext.current
@@ -61,23 +62,23 @@ fun MelodyTheme(
     }
   }
 
-  val customTypography = androidx.compose.runtime.remember(customFontFamily) {
+  val customTypography = androidx.compose.runtime.remember(customFontFamily, fontSizeScale) {
     androidx.compose.material3.Typography(
-        displayLarge = Typography.displayLarge.copy(fontFamily = customFontFamily),
-        displayMedium = Typography.displayMedium.copy(fontFamily = customFontFamily),
-        displaySmall = Typography.displaySmall.copy(fontFamily = customFontFamily),
-        headlineLarge = Typography.headlineLarge.copy(fontFamily = customFontFamily),
-        headlineMedium = Typography.headlineMedium.copy(fontFamily = customFontFamily),
-        headlineSmall = Typography.headlineSmall.copy(fontFamily = customFontFamily),
-        titleLarge = Typography.titleLarge.copy(fontFamily = customFontFamily),
-        titleMedium = Typography.titleMedium.copy(fontFamily = customFontFamily),
-        titleSmall = Typography.titleSmall.copy(fontFamily = customFontFamily),
-        bodyLarge = Typography.bodyLarge.copy(fontFamily = customFontFamily),
-        bodyMedium = Typography.bodyMedium.copy(fontFamily = customFontFamily),
-        bodySmall = Typography.bodySmall.copy(fontFamily = customFontFamily),
-        labelLarge = Typography.labelLarge.copy(fontFamily = customFontFamily),
-        labelMedium = Typography.labelMedium.copy(fontFamily = customFontFamily),
-        labelSmall = Typography.labelSmall.copy(fontFamily = customFontFamily)
+        displayLarge = Typography.displayLarge.copy(fontFamily = customFontFamily, fontSize = Typography.displayLarge.fontSize * fontSizeScale),
+        displayMedium = Typography.displayMedium.copy(fontFamily = customFontFamily, fontSize = Typography.displayMedium.fontSize * fontSizeScale),
+        displaySmall = Typography.displaySmall.copy(fontFamily = customFontFamily, fontSize = Typography.displaySmall.fontSize * fontSizeScale),
+        headlineLarge = Typography.headlineLarge.copy(fontFamily = customFontFamily, fontSize = Typography.headlineLarge.fontSize * fontSizeScale),
+        headlineMedium = Typography.headlineMedium.copy(fontFamily = customFontFamily, fontSize = Typography.headlineMedium.fontSize * fontSizeScale),
+        headlineSmall = Typography.headlineSmall.copy(fontFamily = customFontFamily, fontSize = Typography.headlineSmall.fontSize * fontSizeScale),
+        titleLarge = Typography.titleLarge.copy(fontFamily = customFontFamily, fontSize = Typography.titleLarge.fontSize * fontSizeScale),
+        titleMedium = Typography.titleMedium.copy(fontFamily = customFontFamily, fontSize = Typography.titleMedium.fontSize * fontSizeScale),
+        titleSmall = Typography.titleSmall.copy(fontFamily = customFontFamily, fontSize = Typography.titleSmall.fontSize * fontSizeScale),
+        bodyLarge = Typography.bodyLarge.copy(fontFamily = customFontFamily, fontSize = Typography.bodyLarge.fontSize * fontSizeScale),
+        bodyMedium = Typography.bodyMedium.copy(fontFamily = customFontFamily, fontSize = Typography.bodyMedium.fontSize * fontSizeScale),
+        bodySmall = Typography.bodySmall.copy(fontFamily = customFontFamily, fontSize = Typography.bodySmall.fontSize * fontSizeScale),
+        labelLarge = Typography.labelLarge.copy(fontFamily = customFontFamily, fontSize = Typography.labelLarge.fontSize * fontSizeScale),
+        labelMedium = Typography.labelMedium.copy(fontFamily = customFontFamily, fontSize = Typography.labelMedium.fontSize * fontSizeScale),
+        labelSmall = Typography.labelSmall.copy(fontFamily = customFontFamily, fontSize = Typography.labelSmall.fontSize * fontSizeScale)
     )
   }
 
