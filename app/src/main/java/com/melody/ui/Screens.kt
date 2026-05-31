@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -58,8 +59,14 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import android.graphics.RenderEffect
+import android.graphics.Shader
+import android.os.Build
+import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -307,11 +314,30 @@ fun MainScreen(
                     }
 
                     val context = androidx.compose.ui.platform.LocalContext.current
+                    val customBackgroundPath by themeViewModel.customBackgroundPath.collectAsState()
                     
-                    Scaffold(
-                        modifier = Modifier,
-                        containerColor = MaterialTheme.colorScheme.background,
-                        contentColor = MaterialTheme.colorScheme.onBackground,
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        if (customBackgroundPath != null) {
+                            AsyncImage(
+                                model = customBackgroundPath,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        color = if (androidx.compose.foundation.isSystemInDarkTheme()) Color.Black.copy(alpha = 0.5f)
+                                        else Color.White.copy(alpha = 0.4f)
+                                    )
+                            )
+                        }
+
+                        Scaffold(
+                            modifier = Modifier,
+                            containerColor = if (customBackgroundPath != null) Color.Transparent else MaterialTheme.colorScheme.background,
+                            contentColor = MaterialTheme.colorScheme.onBackground,
                         topBar = {
                             @OptIn(ExperimentalMaterial3Api::class)
                             TopAppBar(
@@ -500,12 +526,16 @@ fun MainScreen(
                             artShape = albumArtShape, 
                             bluetoothDevices = bluetoothDevices,
                             onSongClick = { musicViewModel.playSong(it, filteredSongs) },
-                            contentPadding = paddingValues
+                            contentPadding = paddingValues,
+                            themeViewModel = themeViewModel
                         )
                         1 -> FolderList(
                             songs = songs, 
+                            searchQuery = searchQuery,
+                            onSearchQueryChange = { musicViewModel.setSearchQuery(it) },
                             useCompact = useCompactLayout,
-                            contentPadding = paddingValues
+                            contentPadding = paddingValues,
+                            themeViewModel = themeViewModel
                         )
                         2 -> SettingsScreen(
                             viewModel = themeViewModel,
@@ -514,6 +544,7 @@ fun MainScreen(
                     }
                 }
             }
+            } // close custom background Box
         }
         } // close AnimatedContent lambda
         
@@ -558,11 +589,22 @@ fun SongList(
     artShape: Shape, 
     bluetoothDevices: List<MusicViewModel.BluetoothDeviceRecord> = emptyList(),
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    themeViewModel: ThemeViewModel,
     onSongClick: (Song) -> Unit
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     var showEarbudsDialog by remember { mutableStateOf(false) }
+
+    val customBackgroundPath by themeViewModel.customBackgroundPath.collectAsState()
+    val listOpacity by themeViewModel.listOpacity.collectAsState()
+    val listSizing by themeViewModel.listSizing.collectAsState()
+
+    val containerBgColor = if (customBackgroundPath != null) {
+        MaterialTheme.colorScheme.surface.copy(alpha = listOpacity)
+    } else {
+        Color.Transparent
+    }
     
     Column {
         Row(
@@ -677,13 +719,32 @@ fun SongList(
             )
         }
         
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = if (customBackgroundPath != null) 12.dp else 0.dp, vertical = if (customBackgroundPath != null) 8.dp else 0.dp)
+                .background(
+                    color = containerBgColor,
+                    shape = RoundedCornerShape(24.dp)
+                )
+                .then(
+                    if (customBackgroundPath != null) {
+                        Modifier.border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                            shape = RoundedCornerShape(24.dp)
+                        )
+                    } else {
+                        Modifier
+                    }
+                )
+        ) {
             LazyColumn(
                 state = listState,
                 contentPadding = PaddingValues(
                     bottom = contentPadding.calculateBottomPadding() + 8.dp,
                     start = 16.dp,
-                    top = contentPadding.calculateTopPadding(),
+                    top = if (customBackgroundPath != null) 12.dp else contentPadding.calculateTopPadding(),
                     end = 16.dp
                 )
             ) {
@@ -692,6 +753,7 @@ fun SongList(
                         song = song, 
                         isCompact = useCompact, 
                         artShape = artShape, 
+                        listSizing = listSizing,
                         onClick = { onSongClick(song) }
                     )
                 }
@@ -764,9 +826,10 @@ fun SongItem(
     song: Song, 
     isCompact: Boolean, 
     artShape: Shape, 
+    listSizing: Float = 1.0f,
     onClick: () -> Unit
 ) {
-    val imageSize = if (isCompact) 40.dp else 56.dp
+    val imageSize = (if (isCompact) 40.dp else 56.dp) * listSizing
     
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
@@ -782,6 +845,7 @@ fun SongItem(
         color = Color.Transparent,
         modifier = Modifier
             .fillMaxWidth()
+            .padding(vertical = (2.dp * listSizing))
     ) {
         ListItem(
             modifier = Modifier
@@ -799,7 +863,9 @@ fun SongItem(
                     fontWeight = FontWeight.Bold, 
                     maxLines = 1, 
                     overflow = TextOverflow.Ellipsis,
-                    style = if (isCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge
+                    style = (if (isCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge).copy(
+                        fontSize = (if (isCompact) 14.sp else 16.sp) * listSizing
+                    )
                 ) 
             },
             supportingContent = { 
@@ -807,7 +873,9 @@ fun SongItem(
                     "${song.artist} • ${song.album}", 
                     maxLines = 1, 
                     overflow = TextOverflow.Ellipsis,
-                    style = if (isCompact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall
+                    style = (if (isCompact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall).copy(
+                        fontSize = (if (isCompact) 11.sp else 12.sp) * listSizing
+                    )
                 ) 
             },
             leadingContent = {
@@ -835,6 +903,11 @@ fun PlaylistList(
     var showAddDialog by remember { mutableStateOf(false) }
     var playlistName by remember { mutableStateOf("") }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val application = context.applicationContext as android.app.Application
+    val themeViewModel = remember { ThemeViewModel(application) }
+    val useLiquidButtons by themeViewModel.useLiquidButtons.collectAsState()
+
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -848,13 +921,16 @@ fun PlaylistList(
                 )
             },
             confirmButton = {
-                Button(onClick = {
-                    if (playlistName.isNotBlank()) {
-                        onCreatePlaylist(playlistName)
-                        playlistName = ""
-                        showAddDialog = false
-                    }
-                }) {
+                MelodyButton(
+                    onClick = {
+                        if (playlistName.isNotBlank()) {
+                            onCreatePlaylist(playlistName)
+                            playlistName = ""
+                            showAddDialog = false
+                        }
+                    },
+                    useLiquid = useLiquidButtons
+                ) {
                     Text("Create")
                 }
             },
@@ -1536,60 +1612,149 @@ fun PlaceholderArt() {
 @Composable
 fun FolderList(
     songs: List<Song>, 
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
     useCompact: Boolean,
-    contentPadding: PaddingValues = PaddingValues(0.dp)
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    themeViewModel: ThemeViewModel
 ) {
-    val folders = remember(songs) { songs.groupBy { it.folderPath } }
+    val folders = remember(songs, searchQuery) { 
+        songs.filter { 
+            it.folderPath.contains(searchQuery, ignoreCase = true) 
+        }.groupBy { it.folderPath } 
+    }
     val shape = MaterialTheme.shapes.extraLarge
-    
-    LazyColumn(
-        contentPadding = PaddingValues(
-            bottom = contentPadding.calculateBottomPadding() + 16.dp,
-            top = contentPadding.calculateTopPadding() + 16.dp,
-            start = 16.dp, 
-            end = 16.dp
-        ),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        folders.forEach { (path, folderSongs) ->
-            item(key = path) {
-                Card(
-                    onClick = { /* Folder detail browsing */ },
-                    shape = shape,
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        contentColor = MaterialTheme.colorScheme.onSurface
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                ) {
-                    ListItem(
-                        headlineContent = { 
-                            Text(
-                                path.substringAfterLast("/"), 
-                                fontWeight = FontWeight.Bold,
-                                style = if (useCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge
-                            ) 
-                        },
-                        supportingContent = { Text("${folderSongs.size} songs • $path", style = MaterialTheme.typography.bodySmall) },
-                        leadingContent = { 
-                            Surface(
-                                shape = MaterialTheme.shapes.medium,
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                modifier = Modifier.size(if (useCompact) 40.dp else 48.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        Icons.Default.Folder, 
-                                        contentDescription = null, 
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        modifier = Modifier.size(if (useCompact) 20.dp else 24.dp)
-                                    )
-                                }
-                            }
-                        },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+
+    val customBackgroundPath by themeViewModel.customBackgroundPath.collectAsState()
+    val listOpacity by themeViewModel.listOpacity.collectAsState()
+    val listSizing by themeViewModel.listSizing.collectAsState()
+
+    val containerBgColor = if (customBackgroundPath != null) {
+        MaterialTheme.colorScheme.surface.copy(alpha = listOpacity)
+    } else {
+        Color.Transparent
+    }
+
+    val cardBgColor = if (customBackgroundPath != null) {
+        MaterialTheme.colorScheme.surface.copy(alpha = listOpacity)
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            TextField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                placeholder = { Text("Search folders...", style = MaterialTheme.typography.bodyMedium) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { onSearchQueryChange("") }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(18.dp))
+                        }
+                    }
+                },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyMedium,
+                shape = RoundedCornerShape(16.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            )
+        }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = if (customBackgroundPath != null) 12.dp else 0.dp, vertical = if (customBackgroundPath != null) 8.dp else 0.dp)
+            .background(
+                color = containerBgColor,
+                shape = RoundedCornerShape(24.dp)
+            )
+            .then(
+                if (customBackgroundPath != null) {
+                    Modifier.border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                        shape = RoundedCornerShape(24.dp)
                     )
+                } else {
+                    Modifier
+                }
+            )
+    ) {
+        LazyColumn(
+            contentPadding = PaddingValues(
+                bottom = contentPadding.calculateBottomPadding() + 16.dp,
+                top = if (customBackgroundPath != null) 16.dp else contentPadding.calculateTopPadding(),
+                start = 16.dp, 
+                end = 16.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            folders.forEach { (path, folderSongs) ->
+                item(key = path) {
+                    Card(
+                        onClick = { /* Folder detail browsing */ },
+                        shape = shape,
+                        colors = CardDefaults.cardColors(
+                            containerColor = cardBgColor,
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = (2.dp * listSizing))
+                    ) {
+                        ListItem(
+                            headlineContent = { 
+                                Text(
+                                    path.substringAfterLast("/"), 
+                                    fontWeight = FontWeight.Bold,
+                                    style = (if (useCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge).copy(
+                                        fontSize = (if (useCompact) 14.sp else 16.sp) * listSizing
+                                    )
+                                ) 
+                            },
+                            supportingContent = { 
+                                Text(
+                                    "${folderSongs.size} songs • $path", 
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontSize = 12.sp * listSizing
+                                    )
+                                ) 
+                            },
+                            leadingContent = { 
+                                Surface(
+                                    shape = MaterialTheme.shapes.medium,
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    modifier = Modifier.size((if (useCompact) 40.dp else 48.dp) * listSizing)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            Icons.Default.Folder, 
+                                            contentDescription = null, 
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            modifier = Modifier.size((if (useCompact) 20.dp else 24.dp) * listSizing)
+                                        )
+                                    }
+                                }
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
                 }
             }
         }
@@ -1828,6 +1993,16 @@ fun SettingsScreen(
     val primaryColor by viewModel.primaryColor.collectAsState()
     val useCompactLayout by viewModel.useCompactLayout.collectAsState()
     val albumArtShapeIndex by viewModel.albumArtShape.collectAsState()
+    val context = LocalContext.current
+    val fontLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { viewModel.importFont(it, context) }
+    }
+    
+    val backgroundLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { viewModel.importBackground(it, context) }
+    }
+    val customFontPath by viewModel.customFontPath.collectAsState()
+    val customBackgroundPath by viewModel.customBackgroundPath.collectAsState()
 
     Column(
         modifier = Modifier
@@ -1869,6 +2044,26 @@ fun SettingsScreen(
                     )
                 }
             )
+
+            val listSizing by viewModel.listSizing.collectAsState()
+            val listOpacity by viewModel.listOpacity.collectAsState()
+
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Library Item Size: ${(listSizing * 100).toInt()}%", style = MaterialTheme.typography.titleSmall)
+                Slider(
+                    value = listSizing,
+                    onValueChange = { viewModel.setListSizing(it) },
+                    valueRange = 0.8f..1.5f
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Background Opacity: ${(listOpacity * 100).toInt()}%", style = MaterialTheme.typography.titleSmall)
+                Slider(
+                    value = listOpacity,
+                    onValueChange = { viewModel.setListOpacity(it) },
+                    valueRange = 0.1f..1.0f
+                )
+            }
+
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
             SettingsItem(
                 title = "تأثير الأزرار السائل",
@@ -1884,6 +2079,55 @@ fun SettingsScreen(
                     )
                 }
             )
+            val useLiquidButtons by viewModel.useLiquidButtons.collectAsState()
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                SettingsItem(
+                    title = "Custom Font",
+                    subtitle = if (customFontPath != null) "Font applied" else "Set custom font",
+                    icon = Icons.Rounded.FontDownload,
+                    onClick = { fontLauncher.launch("font/ttf") },
+                    trailing = if (customFontPath != null) {
+                        { IconButton(onClick = { viewModel.clearCustomFont(context) }) { Icon(Icons.Default.Delete, null) } }
+                    } else null
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                SettingsItem(
+                    title = "Custom Background",
+                    subtitle = if (customBackgroundPath != null) "Background applied" else "Set custom background",
+                    icon = Icons.Rounded.Image,
+                    onClick = { backgroundLauncher.launch("image/*") },
+                    trailing = if (customBackgroundPath != null) {
+                        { IconButton(onClick = { viewModel.clearCustomBackground(context) }) { Icon(Icons.Default.Delete, null) } }
+                    } else null
+                )
+                
+                MelodyButton(
+                    onClick = {
+                        viewModel.setUseLiquidButtons(!useLiquidButtons)
+                    },
+                    useLiquid = useLiquidButtons,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(
+                        imageVector = if (useLiquidButtons) Icons.Rounded.AutoAwesome else Icons.Rounded.TouchApp,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (useLiquidButtons) "معاينة: تم تفعيل الأزرار الزجاجية السائلة" else "معاينة: انقر لتفعيل التصميم الزجاجي",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
 
         SettingsGroup(title = "Creative Canvas") {
@@ -2242,18 +2486,20 @@ fun LiquidButton(
     val swayX = (animatedOffsetX * 0.15f).coerceIn(-12f, 12f) * pressProgress
     val swayY = (animatedOffsetY * 0.15f).coerceIn(-12f, 12f) * pressProgress
 
+    val isDark = isSystemInDarkTheme()
+
     val containerColor = if (surfaceColor.isSpecified) {
         surfaceColor
     } else if (tint.isSpecified) {
         tint.copy(alpha = 0.32f)
     } else {
-        if (isSystemInDarkTheme()) Color(0xFF2C2C2C).copy(alpha = 0.48f) else Color(0xFFF0F0F0).copy(alpha = 0.65f)
+        if (isDark) Color(0xFF2C2C2C).copy(alpha = 0.48f) else Color(0xFFF0F0F0).copy(alpha = 0.65f)
     }
 
     val finalBorderColor = if (tint.isSpecified) {
         tint.copy(alpha = 0.60f)
     } else {
-        if (isSystemInDarkTheme()) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.12f)
+        if (isDark) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.12f)
     }
 
     Box(
@@ -2287,22 +2533,71 @@ fun LiquidButton(
                 }
             }
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
-            .background(containerColor)
-            .border(
-                width = 1.2.dp,
-                color = finalBorderColor,
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
-            )
             .clickable(
                 interactionSource = interactionSource,
                 indication = androidx.compose.foundation.LocalIndication.current,
                 onClick = onClick
             )
-            .height(48.dp)
-            .padding(horizontal = 16.dp),
+            .height(48.dp),
         contentAlignment = Alignment.Center
     ) {
+        val blurEffect = remember {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                RenderEffect.createBlurEffect(
+                    30f, 30f, Shader.TileMode.CLAMP
+                ).asComposeRenderEffect()
+            } else {
+                null
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer {
+                    if (blurEffect != null) {
+                        renderEffect = blurEffect
+                    }
+                }
+                .drawWithCache {
+                    onDrawWithContent {
+                        // Base water glass gradient that mimics glass sheet refraction
+                        drawRoundRect(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = if (isDark) 0.08f else 0.22f),
+                                    Color.White.copy(alpha = if (isDark) 0.02f else 0.07f)
+                                )
+                            ),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(24.dp.toPx())
+                        )
+                        // Low-alpha tint overlay that makes the glass blend perfectly with the app theme
+                        if (tint.isSpecified && tint != Color.Transparent) {
+                            drawRoundRect(
+                                color = tint.copy(alpha = if (isDark) 0.06f else 0.12f),
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(24.dp.toPx()),
+                                blendMode = androidx.compose.ui.graphics.BlendMode.SrcOver
+                            )
+                        }
+                        // Liquid edge top shine highlighting (3D curved glass reflection effect)
+                        drawRoundRect(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = if (isDark) 0.35f else 0.65f),
+                                    Color.White.copy(alpha = 0.05f)
+                                )
+                            ),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(24.dp.toPx()),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                width = 1.3.dp.toPx()
+                            )
+                        )
+                    }
+                }
+        )
+
         Row(
+            modifier = Modifier.padding(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically
         ) {

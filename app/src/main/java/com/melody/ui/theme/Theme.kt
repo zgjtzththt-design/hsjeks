@@ -38,8 +38,49 @@ fun MelodyTheme(
   darkTheme: Boolean = isSystemInDarkTheme(),
   dynamicColor: Boolean = true,
   customColor: androidx.compose.ui.graphics.Color? = null,
+  customFontPath: String? = null,
   content: @Composable () -> Unit,
 ) {
+  val context = LocalContext.current
+  val customFontFamily = androidx.compose.runtime.remember(customFontPath) {
+    if (customFontPath != null) {
+      try {
+        val file = java.io.File(customFontPath)
+        if (file.exists()) {
+          androidx.compose.ui.text.font.FontFamily(
+            androidx.compose.ui.text.font.Font(file)
+          )
+        } else {
+          androidx.compose.ui.text.font.FontFamily.Default
+        }
+      } catch (e: Exception) {
+        androidx.compose.ui.text.font.FontFamily.Default
+      }
+    } else {
+      androidx.compose.ui.text.font.FontFamily.Default
+    }
+  }
+
+  val customTypography = androidx.compose.runtime.remember(customFontFamily) {
+    androidx.compose.material3.Typography(
+        displayLarge = Typography.displayLarge.copy(fontFamily = customFontFamily),
+        displayMedium = Typography.displayMedium.copy(fontFamily = customFontFamily),
+        displaySmall = Typography.displaySmall.copy(fontFamily = customFontFamily),
+        headlineLarge = Typography.headlineLarge.copy(fontFamily = customFontFamily),
+        headlineMedium = Typography.headlineMedium.copy(fontFamily = customFontFamily),
+        headlineSmall = Typography.headlineSmall.copy(fontFamily = customFontFamily),
+        titleLarge = Typography.titleLarge.copy(fontFamily = customFontFamily),
+        titleMedium = Typography.titleMedium.copy(fontFamily = customFontFamily),
+        titleSmall = Typography.titleSmall.copy(fontFamily = customFontFamily),
+        bodyLarge = Typography.bodyLarge.copy(fontFamily = customFontFamily),
+        bodyMedium = Typography.bodyMedium.copy(fontFamily = customFontFamily),
+        bodySmall = Typography.bodySmall.copy(fontFamily = customFontFamily),
+        labelLarge = Typography.labelLarge.copy(fontFamily = customFontFamily),
+        labelMedium = Typography.labelMedium.copy(fontFamily = customFontFamily),
+        labelSmall = Typography.labelSmall.copy(fontFamily = customFontFamily)
+    )
+  }
+
   val colorScheme =
     when {
       dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
@@ -72,5 +113,5 @@ fun MelodyTheme(
       else -> LightColorScheme
     }
 
-  MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
+  MaterialTheme(colorScheme = colorScheme, typography = customTypography, content = content)
 }

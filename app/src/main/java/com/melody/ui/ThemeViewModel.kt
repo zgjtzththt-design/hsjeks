@@ -26,6 +26,19 @@ class ThemeViewModel(application: Application) : AndroidViewModel(application) {
     private val _useLiquidButtons = MutableStateFlow(prefs.getBoolean("use_liquid_buttons", false))
     val useLiquidButtons: StateFlow<Boolean> = _useLiquidButtons
 
+    // New values for list sizing, opacity, background, and fonts
+    private val _listSizing = MutableStateFlow(prefs.getFloat("list_sizing", 1.0f))
+    val listSizing: StateFlow<Float> = _listSizing
+
+    private val _listOpacity = MutableStateFlow(prefs.getFloat("list_opacity", 0.8f))
+    val listOpacity: StateFlow<Float> = _listOpacity
+
+    private val _customBackgroundPath = MutableStateFlow(prefs.getString("custom_background_path", null))
+    val customBackgroundPath: StateFlow<String?> = _customBackgroundPath
+
+    private val _customFontPath = MutableStateFlow(prefs.getString("custom_font_path", null))
+    val customFontPath: StateFlow<String?> = _customFontPath
+
     fun setDynamicColor(enabled: Boolean) {
         _useDynamicColor.value = enabled
         prefs.edit().putBoolean("dynamic_color", enabled).apply()
@@ -49,5 +62,85 @@ class ThemeViewModel(application: Application) : AndroidViewModel(application) {
     fun setUseLiquidButtons(enabled: Boolean) {
         _useLiquidButtons.value = enabled
         prefs.edit().putBoolean("use_liquid_buttons", enabled).apply()
+    }
+
+    fun setListSizing(value: Float) {
+        _listSizing.value = value
+        prefs.edit().putFloat("list_sizing", value).apply()
+    }
+
+    fun setListOpacity(value: Float) {
+        _listOpacity.value = value
+        prefs.edit().putFloat("list_opacity", value).apply()
+    }
+
+    fun importFont(uri: android.net.Uri, context: Context): Boolean {
+        return try {
+            val inputStream = context.contentResolver.openInputStream(uri) ?: return false
+            val file = java.io.File(context.filesDir, "custom_font.ttf")
+            if (file.exists()) {
+                file.delete()
+            }
+            val outputStream = java.io.FileOutputStream(file)
+            inputStream.use { input ->
+                outputStream.use { output ->
+                    input.copyTo(output)
+                }
+            }
+            _customFontPath.value = file.absolutePath
+            prefs.edit().putString("custom_font_path", file.absolutePath).apply()
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    fun clearCustomFont(context: Context) {
+        _customFontPath.value = null
+        prefs.edit().remove("custom_font_path").apply()
+        try {
+            val file = java.io.File(context.filesDir, "custom_font.ttf")
+            if (file.exists()) {
+                file.delete()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun importBackground(uri: android.net.Uri, context: Context): Boolean {
+        return try {
+            val inputStream = context.contentResolver.openInputStream(uri) ?: return false
+            val file = java.io.File(context.filesDir, "custom_background.jpg")
+            if (file.exists()) {
+                file.delete()
+            }
+            val outputStream = java.io.FileOutputStream(file)
+            inputStream.use { input ->
+                outputStream.use { output ->
+                    input.copyTo(output)
+                }
+            }
+            _customBackgroundPath.value = file.absolutePath
+            prefs.edit().putString("custom_background_path", file.absolutePath).apply()
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    fun clearCustomBackground(context: Context) {
+        _customBackgroundPath.value = null
+        prefs.edit().remove("custom_background_path").apply()
+        try {
+            val file = java.io.File(context.filesDir, "custom_background.jpg")
+            if (file.exists()) {
+                file.delete()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }
