@@ -1220,7 +1220,9 @@ fun PlayerScreen(
         label = "BeatPulse"
     )
 
-    val rhythmScale = if (enableBeatBounce && isPlaying) (1f + audioAmplitude * 0.2f) else 1f
+    val rhythmScale by remember(audioAmplitude, enableBeatBounce, isPlaying) {
+        derivedStateOf { if (enableBeatBounce && isPlaying) (1f + audioAmplitude * 0.2f) else 1f }
+    }
 
     val infiniteTransition = rememberInfiniteTransition(label = "PulseTransition")
     val animatedAlpha by infiniteTransition.animateFloat(
