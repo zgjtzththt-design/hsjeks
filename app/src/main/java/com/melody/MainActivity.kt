@@ -54,6 +54,10 @@ class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
+    androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+        hide(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+        systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    }
     setContent {
       val dynamicColor by themeViewModel.useDynamicColor.collectAsState()
       val primaryColor by themeViewModel.primaryColor.collectAsState()

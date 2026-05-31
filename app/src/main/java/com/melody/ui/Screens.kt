@@ -18,6 +18,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.Icons
@@ -80,7 +82,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.Canvas
 import coil.compose.AsyncImage
@@ -1158,17 +1159,25 @@ fun PlayerScreen(
     )
 
     // Rhythmic Folder Offset
+    var manualMovementEnabled by remember { mutableStateOf(false) }
+    var manualOffset by remember { mutableStateOf(Offset.Zero) }
+
     val folderOffset by animateDpAsState(
-        targetValue = if (enableRhythmicFolder && isPlaying) (audioAmplitude * 100).dp else 0.dp,
+        targetValue = if (enableRhythmicFolder && isPlaying && !manualMovementEnabled) (audioAmplitude * 100).dp else 0.dp,
         animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow),
         label = "FolderMovement"
     )
 
     val folderRotation by animateFloatAsState(
-        targetValue = if (enableRhythmicFolder && isPlaying) audioAmplitude * 45f else 0f,
+        targetValue = if (enableRhythmicFolder && isPlaying && !manualMovementEnabled) audioAmplitude * 45f else 0f,
         animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow),
         label = "FolderRotation"
     )
+
+    // Manual offset for manual movement
+    val manualOffsetPx = with(LocalDensity.current) {
+        Offset(manualOffset.x, manualOffset.y)
+    }
 
     // 3D Flip animation when song changes
     var flipAngle by remember { mutableFloatStateOf(0f) }
@@ -1253,10 +1262,13 @@ fun PlayerScreen(
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Start
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     IconButton(onClick = onDismiss) {
                         Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Back", modifier = Modifier.size(32.dp))
+                    }
+                    IconButton(onClick = { musicViewModel.setVolumeLevel(300) }) {
+                        Icon(Icons.Default.VolumeUp, contentDescription = "Enhanced Audio", modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
                     }
                 }
 
@@ -1268,12 +1280,25 @@ fun PlayerScreen(
                         scaleX = albumScale * animatedPopScale * activeBeatScale
                         scaleY = albumScale * animatedPopScale * activeBeatScale
                         rotationY = animatedFlip + folderRotation
-                        translationY = folderOffset.toPx()
+                        translationY = folderOffset.toPx() + manualOffsetPx.y
+                        translationX = manualOffsetPx.x
                         cameraDistance = 8 * density
                     }
                     .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragEnd = { /* handle end */ },
+                            onDrag = { change, dragAmount -> 
+                                if (manualMovementEnabled) {
+                                    manualOffset += dragAmount
+                                    change.consume()
+                                }
+                            }
+                        )
+                    }
+                    .pointerInput(Unit) {
                         detectTapGestures(
-                            onLongPress = { showAlbumMenu = true }
+                            onLongPress = { showAlbumMenu = true },
+                            onDoubleTap = { manualMovementEnabled = !manualMovementEnabled }
                         )
                     }
                 ) {
