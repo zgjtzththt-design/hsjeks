@@ -276,7 +276,7 @@ fun MainScreen(
                 CastBottomSheet(onDismiss = { showCastSheet = false })
             }
 
-            val pagerState = rememberPagerState(pageCount = { 3 })
+            val pagerState = rememberPagerState(pageCount = { 4 })
             val coroutineScope = rememberCoroutineScope()
 
             val showVolumeBar by musicViewModel.showVolumeBar.collectAsState()
@@ -389,7 +389,7 @@ fun MainScreen(
                         ) {
                             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                                 val barWidth = maxWidth
-                                val tabCount = 3
+                                val tabCount = 4
                                 val tabWidth = barWidth / tabCount
 
                                 val targetFraction by remember {
@@ -437,7 +437,8 @@ fun MainScreen(
                                     val tabsList = listOf(
                                         0 to ("Library" to Icons.Filled.LibraryMusic to Icons.Outlined.LibraryMusic),
                                         1 to ("Folders" to Icons.Filled.Folder to Icons.Outlined.Folder),
-                                        2 to ("Settings" to Icons.Filled.Settings to Icons.Outlined.Settings)
+                                        2 to ("Focus" to Icons.Filled.Timer to Icons.Outlined.Timer),
+                                        3 to ("Settings" to Icons.Filled.Settings to Icons.Outlined.Settings)
                                     )
                                     tabsList.forEach { (page, info) ->
                                         val (textAndIcons, inactiveIcon) = info
@@ -538,7 +539,12 @@ fun MainScreen(
                             contentPadding = paddingValues,
                             themeViewModel = themeViewModel
                         )
-                        2 -> SettingsScreen(
+                        2 -> FocusScreen(
+                            themeViewModel = themeViewModel,
+                            musicViewModel = musicViewModel,
+                            contentPadding = paddingValues
+                        )
+                        3 -> SettingsScreen(
                             viewModel = themeViewModel,
                             contentPadding = paddingValues
                         )
