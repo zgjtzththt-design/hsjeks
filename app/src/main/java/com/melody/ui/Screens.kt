@@ -834,33 +834,75 @@ fun SongItem(
     
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.90f else 1f,
+        targetValue = if (isPressed) 0.92f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
+            stiffness = Spring.StiffnessMedium
         ),
         label = "SongItemScale"
     )
 
-    Surface(
-        color = Color.Transparent,
+    // Expressive Asymmetric Corner Shape
+    val itemShape = RoundedCornerShape(
+        topStart = 24.dp * listSizing,
+        bottomStart = 8.dp * listSizing,
+        topEnd = 8.dp * listSizing,
+        bottomEnd = 24.dp * listSizing
+    )
+
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = (2.dp * listSizing))
+            .padding(vertical = (3.dp * listSizing))
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clickable { 
+                isPressed = true
+                onClick()
+            }
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                shape = itemShape
+            ),
+        shape = itemShape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+            contentColor = MaterialTheme.colorScheme.onSurface
+        )
     ) {
-        ListItem(
+        Row(
             modifier = Modifier
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
-                .clickable { 
-                    isPressed = true
-                    onClick()
-                },
-            headlineContent = { 
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Elegant vertical accent block on the left representing active state guide
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .height(32.dp * listSizing)
+                    .background(
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = RoundedCornerShape(2.dp)
+                    )
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Leading Album Art
+            AlbumArt(song.albumArtUri, imageSize, artShape)
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // Titles
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
                 Text(
-                    song.title, 
+                    text = song.title, 
                     fontWeight = FontWeight.Bold, 
                     maxLines = 1, 
                     overflow = TextOverflow.Ellipsis,
@@ -868,22 +910,38 @@ fun SongItem(
                         fontSize = (if (isCompact) 14.sp else 16.sp) * listSizing
                     )
                 ) 
-            },
-            supportingContent = { 
+                
+                Spacer(modifier = Modifier.height(2.dp))
+
                 Text(
-                    "${song.artist} • ${song.album}", 
+                    text = "${song.artist} • ${song.album}", 
                     maxLines = 1, 
                     overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                     style = (if (isCompact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall).copy(
-                        fontSize = (if (isCompact) 11.sp else 12.sp) * listSizing
+                        fontSize = (if (isCompact) 10.sp else 12.sp) * listSizing
                     )
                 ) 
-            },
-            leadingContent = {
-                AlbumArt(song.albumArtUri, imageSize, artShape)
-            },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-        )
+            }
+
+            // High aesthetic M3 Expressive play detail button
+            IconButton(
+                onClick = onClick,
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f),
+                        shape = CircleShape
+                    )
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.PlayArrow,
+                    contentDescription = "Play",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
     }
     
     LaunchedEffect(isPressed) {
@@ -956,33 +1014,68 @@ fun PlaylistList(
                 )
             ) {
                 items(playlists, key = { it.id }) { playlist ->
+                    val playlistShape = RoundedCornerShape(topStart = 12.dp, topEnd = 28.dp, bottomStart = 28.dp, bottomEnd = 12.dp)
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        shape = MaterialTheme.shapes.large,
+                            .padding(vertical = 6.dp)
+                            .border(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                shape = playlistShape
+                            ),
+                        shape = playlistShape,
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f),
                             contentColor = MaterialTheme.colorScheme.onSurface
                         )
                     ) {
                         ListItem(
-                            headlineContent = { Text(playlist.name, fontWeight = FontWeight.Bold) },
-                            supportingContent = { Text("Playlist", style = MaterialTheme.typography.bodySmall) },
+                            headlineContent = { 
+                                Text(
+                                    text = playlist.name, 
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.bodyLarge
+                                ) 
+                            },
+                            supportingContent = { 
+                                Text(
+                                    text = "قائمة تشغيل مخصصة | Playlist", 
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                ) 
+                            },
                             leadingContent = {
                                 Surface(
-                                    modifier = Modifier.size(48.dp),
-                                    shape = MaterialTheme.shapes.medium,
-                                    color = MaterialTheme.colorScheme.primaryContainer
+                                    modifier = Modifier.size(52.dp),
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Default.PlaylistPlay, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                        Icon(
+                                            imageVector = Icons.Default.PlaylistPlay, 
+                                            contentDescription = null, 
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            modifier = Modifier.size(28.dp)
+                                        )
                                     }
                                 }
                             },
                             trailingContent = {
-                                IconButton(onClick = { onDeletePlaylist(playlist) }) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                                IconButton(
+                                    onClick = { onDeletePlaylist(playlist) },
+                                    modifier = Modifier
+                                        .background(
+                                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f),
+                                            shape = CircleShape
+                                        )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete, 
+                                        contentDescription = "Delete", 
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(20.dp)
+                                    )
                                 }
                             },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
@@ -1729,21 +1822,27 @@ fun FolderList(
 
                 folders.forEach { (path, folderSongs) ->
                     item(key = path) {
+                        val folderShape = RoundedCornerShape(topStart = 28.dp, bottomEnd = 28.dp, topEnd = 12.dp, bottomStart = 12.dp)
                         Card(
                             onClick = { /* Folder detail browsing */ },
-                            shape = shape,
+                            shape = folderShape,
                             colors = CardDefaults.cardColors(
-                                containerColor = cardBgColor,
+                                containerColor = cardBgColor.copy(alpha = 0.6f),
                                 contentColor = MaterialTheme.colorScheme.onSurface
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = (2.dp * listSizing))
+                                .padding(vertical = (3.dp * listSizing))
+                                .border(
+                                    width = 1.dp,
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                    shape = folderShape
+                                )
                         ) {
                             ListItem(
                                 headlineContent = { 
                                     Text(
-                                        path.substringAfterLast("/"), 
+                                        text = path.substringAfterLast("/"), 
                                         fontWeight = FontWeight.Bold,
                                         style = (if (useCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge).copy(
                                             fontSize = (if (useCompact) 14.sp else 16.sp) * listSizing
@@ -1752,27 +1851,35 @@ fun FolderList(
                                 },
                                 supportingContent = { 
                                     Text(
-                                        "${folderSongs.size} songs • $path", 
+                                        text = "${folderSongs.size} tracks • $path", 
                                         style = MaterialTheme.typography.bodySmall.copy(
-                                            fontSize = 12.sp * listSizing
-                                        )
+                                            fontSize = 11.sp * listSizing
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                                     ) 
                                 },
                                 leadingContent = { 
                                     Surface(
-                                        shape = MaterialTheme.shapes.medium,
-                                        color = MaterialTheme.colorScheme.primaryContainer,
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
                                         modifier = Modifier.size((if (useCompact) 40.dp else 48.dp) * listSizing)
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
                                             Icon(
-                                                Icons.Default.Folder, 
+                                                imageVector = Icons.Default.Folder, 
                                                 contentDescription = null, 
                                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                                 modifier = Modifier.size((if (useCompact) 20.dp else 24.dp) * listSizing)
                                             )
                                         }
                                     }
+                                },
+                                trailingContent = {
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronRight,
+                                        contentDescription = "Details",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    )
                                 },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                             )
@@ -2363,16 +2470,24 @@ fun BluetoothBatterySheet(musicViewModel: MusicViewModel, onDismiss: () -> Unit)
                     modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)
                 ) {
                     items(devices) { device ->
+                        val deviceShape = RoundedCornerShape(14.dp, 24.dp, 14.dp, 24.dp)
                         Surface(
-                            onClick = { /* Clicking could potentially trigger connect, but usually system handles it */ },
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (device.isConnected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else Color.Transparent,
-                            modifier = Modifier.padding(vertical = 4.dp)
+                            onClick = { /* Clicking could trigger connect */ },
+                            shape = deviceShape,
+                            color = if (device.isConnected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            modifier = Modifier
+                                .padding(vertical = 6.dp)
+                                .fillMaxWidth()
+                                .border(
+                                    width = 1.dp,
+                                    color = if (device.isConnected) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.08f),
+                                    shape = deviceShape
+                                )
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(12.dp),
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(
@@ -2380,7 +2495,7 @@ fun BluetoothBatterySheet(musicViewModel: MusicViewModel, onDismiss: () -> Unit)
                                     modifier = Modifier
                                         .size(48.dp)
                                         .background(
-                                            if (device.isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, 
+                                            if (device.isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), 
                                             CircleShape
                                         )
                                 ) {
@@ -2388,7 +2503,7 @@ fun BluetoothBatterySheet(musicViewModel: MusicViewModel, onDismiss: () -> Unit)
                                         imageVector = if (device.name.lowercase().contains("headphones") || device.name.lowercase().contains("earbuds")) 
                                             Icons.Default.Headset else Icons.Default.Bluetooth,
                                         contentDescription = null,
-                                        tint = if (device.isConnected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        tint = if (device.isConnected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
                                     )
                                 }
                                 
@@ -2396,26 +2511,38 @@ fun BluetoothBatterySheet(musicViewModel: MusicViewModel, onDismiss: () -> Unit)
                                 
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        device.name, 
+                                        text = device.name, 
                                         style = MaterialTheme.typography.bodyLarge, 
-                                        fontWeight = FontWeight.SemiBold,
+                                        fontWeight = FontWeight.Bold,
                                         color = if (device.isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                     )
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         if (device.isConnected) {
                                             Text(
-                                                "Connected • ", 
+                                                text = "Connected • ", 
                                                 style = MaterialTheme.typography.labelSmall, 
                                                 color = MaterialTheme.colorScheme.primary,
-                                                fontWeight = FontWeight.Bold
+                                                fontWeight = FontWeight.ExtraBold
                                             )
                                         }
-                                        Text(device.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(
+                                            text = device.address, 
+                                            style = MaterialTheme.typography.bodySmall, 
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                        )
                                     }
                                 }
 
                                 if (device.batteryLevel != null) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .background(
+                                                color = if (device.batteryLevel > 20) Color.Green.copy(alpha = 0.12f) else Color.Red.copy(alpha = 0.12f),
+                                                shape = RoundedCornerShape(8.dp)
+                                            )
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
                                         Icon(
                                             imageVector = if (device.batteryLevel > 20) Icons.Default.BatteryFull else Icons.Default.BatteryAlert,
                                             contentDescription = null,
@@ -2423,7 +2550,11 @@ fun BluetoothBatterySheet(musicViewModel: MusicViewModel, onDismiss: () -> Unit)
                                             tint = if (device.batteryLevel > 20) Color.Green else Color.Red
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("${device.batteryLevel}%", style = MaterialTheme.typography.bodyMedium)
+                                        Text(
+                                            text = "${device.batteryLevel}%", 
+                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = if (device.batteryLevel > 20) Color.Green else Color.Red
+                                        )
                                     }
                                 }
                             }
