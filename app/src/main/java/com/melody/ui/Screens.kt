@@ -2052,29 +2052,78 @@ fun SettingsItem(
     trailing: @Composable (() -> Unit)? = null,
     onClick: (() -> Unit)? = null
 ) {
+    val iconShape = RoundedCornerShape(
+        topStart = 14.dp,
+        bottomStart = 6.dp,
+        topEnd = 6.dp,
+        bottomEnd = 14.dp
+    )
+    
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.95f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "SettingsItemScale"
+    )
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(16.dp),
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable {
+                        isPressed = true
+                        onClick()
+                    }
+                } else Modifier
+            )
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Surface(
-            shape = RoundedCornerShape(12.dp),
+            shape = iconShape,
             color = iconContainerColor,
-            modifier = Modifier.size(40.dp)
+            modifier = Modifier
+                .size(42.dp)
+                .border(
+                    width = 1.dp,
+                    color = iconColor.copy(alpha = 0.15f),
+                    shape = iconShape
+                )
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
+                Icon(
+                    imageVector = icon, 
+                    contentDescription = null, 
+                    tint = iconColor, 
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
         
         Spacer(modifier = Modifier.width(16.dp))
         
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = title, 
+                style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp), 
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
             if (subtitle != null) {
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle, 
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp), 
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                )
             }
         }
         
@@ -2084,29 +2133,61 @@ fun SettingsItem(
             }
         }
     }
+    
+    LaunchedEffect(isPressed) {
+        if (isPressed) {
+            kotlinx.coroutines.delay(80)
+            isPressed = false
+        }
+    }
 }
 
 @Composable
 fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
+    val groupShape = RoundedCornerShape(
+        topStart = 28.dp,
+        bottomStart = 12.dp,
+        topEnd = 12.dp,
+        bottomEnd = 28.dp
+    )
     Column(modifier = Modifier.padding(bottom = 24.dp)) {
-        Text(
-            text = title.uppercase(),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-            letterSpacing = 1.2.sp
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .height(18.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = RoundedCornerShape(2.dp)
+                    )
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = title.uppercase(),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                letterSpacing = 1.2.sp
+            )
+        }
         Surface(
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = groupShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
             contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 1.dp,
+            tonalElevation = 2.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp)
+                .padding(horizontal = 12.dp)
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    shape = groupShape
+                )
         ) {
-            Column {
+            Column(modifier = Modifier.padding(vertical = 8.dp)) {
                 content()
             }
         }
@@ -2140,37 +2221,45 @@ fun SettingsScreen(
             .padding(top = contentPadding.calculateTopPadding())
             .verticalScroll(rememberScrollState())
             .padding(
-                top = 16.dp, 
-                bottom = contentPadding.calculateBottomPadding() + 32.dp
+                top = 20.dp, 
+                bottom = contentPadding.calculateBottomPadding() + 40.dp
             )
     ) {
-        SettingsGroup(title = "Visual Essence") {
+        SettingsGroup(title = "Visual Essence | المظهر البصري") {
             SettingsItem(
-                title = "Dynamic Theming",
-                subtitle = "Sync interface with system wallpaper",
+                title = "Dynamic Theming | السمات الديناميكية",
+                subtitle = "Sync interface with system wallpaper\nمزامنة ألوان الواجهة مع خلفية النظام",
                 icon = Icons.Rounded.Palette,
                 iconContainerColor = Color(0xFF4CAF50).copy(alpha = 0.2f),
                 iconColor = Color(0xFF2E7D32),
                 trailing = {
                     Switch(
                         checked = dynamicColor,
-                        onCheckedChange = { viewModel.setDynamicColor(it) }
+                        onCheckedChange = { viewModel.setDynamicColor(it) },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.primary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                        )
                     )
                 }
             )
         }
 
-        SettingsGroup(title = "Interface") {
+        SettingsGroup(title = "Interface Controls | واجهة التحكم") {
             SettingsItem(
-                title = "Compact Mode",
-                subtitle = "Maximize content on screen",
+                title = "Compact Mode | الوضع المضغوط",
+                subtitle = "Maximize content on screen\nعرض عناصر ومحتوى أكثر على الشاشة",
                 icon = Icons.Rounded.ViewList,
                 iconContainerColor = Color(0xFFFF9800).copy(alpha = 0.2f),
                 iconColor = Color(0xFFE65100),
                 trailing = {
                     Switch(
                         checked = useCompactLayout,
-                        onCheckedChange = { viewModel.setCompactLayout(it) }
+                        onCheckedChange = { viewModel.setCompactLayout(it) },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.secondary,
+                            checkedTrackColor = MaterialTheme.colorScheme.secondaryContainer
+                        )
                     )
                 }
             )
@@ -2178,33 +2267,176 @@ fun SettingsScreen(
             val listSizing by viewModel.listSizing.collectAsState()
             val listOpacity by viewModel.listOpacity.collectAsState()
 
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Library Item Size: ${(listSizing * 100).toInt()}%", style = MaterialTheme.typography.titleSmall)
+            // Expressive styled sliders block
+            Column(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.06f),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .padding(14.dp)
+            ) {
+                // Slider 1: List Sizing
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.AspectRatio,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Item Sizing | حجم العناصر والخطوط", 
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Text(
+                        text = "${(listSizing * 100).toInt()}%", 
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.primary, 
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    )
+                }
                 Slider(
                     value = listSizing,
                     onValueChange = { viewModel.setListSizing(it) },
-                    valueRange = 0.8f..1.5f
+                    valueRange = 0.8f..1.5f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                        inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
+                    )
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Background Opacity: ${(listOpacity * 100).toInt()}%", style = MaterialTheme.typography.titleSmall)
+                
+                Spacer(modifier = Modifier.height(14.dp))
+                
+                // Slider 2: Background Opacity
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f),
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Opacity,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Background Opacity | شفافية الخلفية", 
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Text(
+                        text = "${(listOpacity * 100).toInt()}%", 
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.secondary, 
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    )
+                }
                 Slider(
                     value = listOpacity,
                     onValueChange = { viewModel.setListOpacity(it) },
-                    valueRange = 0.1f..1.0f
+                    valueRange = 0.1f..1.0f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.secondary,
+                        activeTrackColor = MaterialTheme.colorScheme.secondary,
+                        inactiveTrackColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.24f)
+                    )
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                
+                Spacer(modifier = Modifier.height(14.dp))
+                
+                // Slider 3: Font Size Scale
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f),
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.FormatSize,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Font Size Scale | مقياس حجم الخط", 
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    val fontSizeScale by viewModel.fontSizeScale.collectAsState()
+                    Text(
+                        text = "${(fontSizeScale * 100).toInt()}%", 
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.tertiary, 
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    )
+                }
                 val fontSizeScale by viewModel.fontSizeScale.collectAsState()
-                Text("Font Size: ${(fontSizeScale * 100).toInt()}%", style = MaterialTheme.typography.titleSmall)
                 Slider(
                     value = fontSizeScale,
                     onValueChange = { viewModel.setFontSizeScale(it) },
-                    valueRange = 0.8f..1.5f
+                    valueRange = 0.8f..1.5f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.tertiary,
+                        activeTrackColor = MaterialTheme.colorScheme.tertiary,
+                        inactiveTrackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.24f)
+                    )
                 )
             }
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+            
             SettingsItem(
-                title = "تأثير الأزرار السائل",
+                title = "تأثير الأزرار السائل | Liquid Theme",
                 subtitle = "تفعيل مظهر وتأثير الأزرار الزجاجية السائلة التفاعلية",
                 icon = Icons.Rounded.TouchApp,
                 iconContainerColor = Color(0xFFE91E63).copy(alpha = 0.2f),
@@ -2217,31 +2449,48 @@ fun SettingsScreen(
                     )
                 }
             )
+            
             val useLiquidButtons by viewModel.useLiquidButtons.collectAsState()
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                SettingsItem(
-                    title = "Custom Font",
-                    subtitle = if (customFontPath != null) "Font applied" else "Set custom font",
-                    icon = Icons.Rounded.FontDownload,
-                    onClick = { fontLauncher.launch("font/ttf") },
-                    trailing = if (customFontPath != null) {
-                        { IconButton(onClick = { viewModel.clearCustomFont(context) }) { Icon(Icons.Default.Delete, null) } }
-                    } else null
-                )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-                SettingsItem(
-                    title = "Custom Background",
-                    subtitle = if (customBackgroundPath != null) "Background applied" else "Set custom background",
-                    icon = Icons.Rounded.Image,
-                    onClick = { backgroundLauncher.launch("image/*") },
-                    trailing = if (customBackgroundPath != null) {
-                        { IconButton(onClick = { viewModel.clearCustomBackground(context) }) { Icon(Icons.Default.Delete, null) } }
-                    } else null
-                )
+                val buttonShape = RoundedCornerShape(topStart = 16.dp, bottomEnd = 16.dp, topEnd = 6.dp, bottomStart = 6.dp)
+                Surface(
+                    shape = buttonShape,
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                            shape = buttonShape
+                        )
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        SettingsItem(
+                            title = "Custom Font | خط مخصص",
+                            subtitle = if (customFontPath != null) "Custom TTF Font applied" else "Import custom .ttf typography",
+                            icon = Icons.Rounded.FontDownload,
+                            onClick = { fontLauncher.launch("font/ttf") },
+                            trailing = if (customFontPath != null) {
+                                { IconButton(onClick = { viewModel.clearCustomFont(context) }) { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) } }
+                            } else null
+                        )
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                        SettingsItem(
+                            title = "Custom Background | خلفية مخصصة",
+                            subtitle = if (customBackgroundPath != null) "Vibrant image applied" else "Set custom wallpaper context",
+                            icon = Icons.Rounded.Image,
+                            onClick = { backgroundLauncher.launch("image/*") },
+                            trailing = if (customBackgroundPath != null) {
+                                { IconButton(onClick = { viewModel.clearCustomBackground(context) }) { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) } }
+                            } else null
+                        )
+                    }
+                }
                 
                 MelodyButton(
                     onClick = {
@@ -2250,7 +2499,7 @@ fun SettingsScreen(
                     useLiquid = useLiquidButtons,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
+                        .height(52.dp),
                     tint = MaterialTheme.colorScheme.primary
                 ) {
                     Icon(
@@ -2268,13 +2517,18 @@ fun SettingsScreen(
             }
         }
 
-        SettingsGroup(title = "Creative Canvas") {
+        SettingsGroup(title = "Creative Canvas | أشكال الألبوم الحية") {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Album Art Geometry", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Album Art Geometry | هندسة غلاف الألبوم", 
+                    style = MaterialTheme.typography.titleSmall, 
+                    fontWeight = FontWeight.Bold, 
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(14.dp))
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     AlbumArtShapes.forEachIndexed { index, shape ->
@@ -2282,13 +2536,24 @@ fun SettingsScreen(
                         Surface(
                             onClick = { viewModel.setAlbumArtShape(index) },
                             shape = shape,
-                            modifier = Modifier.size(64.dp),
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                            tonalElevation = if (isSelected) 8.dp else 0.dp
+                            modifier = Modifier
+                                .size(60.dp)
+                                .border(
+                                    width = if (isSelected) 2.dp else 1.dp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                                    shape = shape
+                                ),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                            tonalElevation = if (isSelected) 6.dp else 0.dp
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 if (isSelected) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
+                                    Icon(
+                                        imageVector = Icons.Default.Check, 
+                                        contentDescription = null, 
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
                             }
                         }
@@ -2299,11 +2564,16 @@ fun SettingsScreen(
             if (!dynamicColor) {
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Atmospheric Accent", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Atmospheric Accent | اللون الأساسي", 
+                        style = MaterialTheme.typography.titleSmall, 
+                        fontWeight = FontWeight.Bold, 
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
                     FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         val colors = listOf(
@@ -2318,18 +2588,18 @@ fun SettingsScreen(
             }
         }
         
-        SettingsGroup(title = "Information") {
+        SettingsGroup(title = "Information | معلومات") {
             SettingsItem(
-                title = "Melody Stream",
-                subtitle = "Stable Build 4.2.1-Liquid",
+                title = "Melody Stream | ميلودي ستريم",
+                subtitle = "Stable Build 4.2.1-Expressive\nإصدار ثابت ومحسن بالكامل",
                 icon = Icons.Rounded.Info,
                 iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
                 iconColor = MaterialTheme.colorScheme.onSecondaryContainer
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
             SettingsItem(
-                title = "Open Source License",
-                subtitle = "Inspired by HyperBridge Project",
+                title = "Open Source License | رخصة مفتوحة",
+                subtitle = "Inspired by HyperBridge Project\nمستوحى من مشروع هايبربريدج",
                 icon = Icons.Rounded.Code,
                 iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
                 iconColor = MaterialTheme.colorScheme.onTertiaryContainer
