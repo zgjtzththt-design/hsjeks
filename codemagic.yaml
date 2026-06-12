@@ -29,8 +29,21 @@ workflows:
         script: |
           cd app/build/outputs/apk/release/
           jarsigner -verify -verbose app-release-signed.apk
+      - name: Create project bundle
+        script: |
+          mkdir -p build/bundle
+          zip -r build/bundle/project-bundle.zip . \
+            -x "*.gradle/*" \
+            ".gradle/*" \
+            "build/*" \
+            ".git/*" \
+            ".gitignore" \
+            "node_modules/*" \
+            ".DS_Store"
+          echo "Project bundle created successfully at build/bundle/project-bundle.zip"
     artifacts:
       - app/build/outputs/apk/release/*.apk
+      - build/bundle/*.zip
     publishing:
       email:
         recipients:
@@ -57,6 +70,19 @@ workflows:
       - name: Run unit tests
         script: |
           ./gradlew test --no-daemon || true
+      - name: Create project bundle
+        script: |
+          mkdir -p build/bundle
+          zip -r build/bundle/project-bundle.zip . \
+            -x "*.gradle/*" \
+            ".gradle/*" \
+            "build/*" \
+            ".git/*" \
+            ".gitignore" \
+            "node_modules/*" \
+            ".DS_Store"
+          echo "Project bundle created successfully"
     artifacts:
       - app/build/outputs/apk/debug/*.apk
       - app/build/reports/tests/**
+      - build/bundle/*.zip
