@@ -7,21 +7,3 @@ plugins {
   alias(libs.plugins.roborazzi) apply false
   alias(libs.plugins.secrets) apply false
 }
-
-tasks.register<Copy>("copyDebugApk") {
-    dependsOn(":app:assembleDebug")
-    from("app/build/outputs/apk/debug/app-debug.apk")
-    into(".build-outputs")
-}
-
-tasks.register<Copy>("copyDebugApkToArabicDownload") {
-    dependsOn(":app:assembleDebug")
-    from("app/build/outputs/apk/debug/app-debug.apk")
-    into("تنزيل ملف APK")
-}
-
-tasks.register<Copy>("copyDebugApkToDownload") {
-    dependsOn(":app:assembleDebug")
-    from("app/build/outputs/apk/debug/app-debug.apk")
-    into("APK_DOWNLOAD")
-}
