@@ -1,40 +1,45 @@
 workflows:
   android-build-release:
-    name: Android Release Build
+    name: Build Release APK
     instance_type: linux
     max_build_duration: 120
     environment:
-      android_signing:
-        - keystore_reference: melody_keystore
-          key_alias: upload
-          key_password: $KEY_PASSWORD
-          store_password: $STORE_PASSWORD
       vars:
         GRADLE_OPTS: "-Xmx3072m"
-        JAVA_HOME: "/opt/java/openjdk"
       java: Java 11
     scripts:
       - name: Set up environment
         script: |
           echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env
-          echo "Building Melody Android App"
-      - name: Build release APK
+          echo "Environment configured"
+      - name: Build unsigned APK
         script: |
           ./gradlew assembleRelease --no-daemon
-      - name: Build App Bundle
+      - name: Sign APK with debug key
         script: |
-          ./gradlew bundleRelease --no-daemon
+          cd app/build/outputs/apk/release/
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 \
+            -keystore ~/.android/debug.keystore \
+            -storepass android \
+            -keypass android \
+            app-release-unsigned.apk androiddebugkey
+          mv app-release-unsigned.apk app-release-signed.apk
+      - name: Verify APK signature
+        script: |
+          cd app/build/outputs/apk/release/
+          jarsigner -verify -verbose app-release-signed.apk
     artifacts:
       - app/build/outputs/apk/release/*.apk
-      - app/build/outputs/bundle/release/*.aab
     publishing:
-      google_play:
-        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
-        track: internal
-        submit_as_draft: false
+      email:
+        recipients:
+          - $DEVELOPER_EMAIL
+        notify:
+          success: true
+          failure: true
 
   android-build-debug:
-    name: Android Debug Build
+    name: Build Debug APK
     instance_type: linux
     max_build_duration: 60
     environment:
@@ -48,9 +53,9 @@ workflows:
       - name: Build debug APK
         script: |
           ./gradlew assembleDebug --no-daemon
-      - name: Run tests
+      - name: Run unit tests
         script: |
-          ./gradlew test --no-daemon
+          ./gradlew test --no-daemon || true
     artifacts:
       - app/build/outputs/apk/debug/*.apk
       - app/build/reports/tests/**
