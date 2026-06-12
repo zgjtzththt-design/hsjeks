@@ -1,68 +1,56 @@
 workflows:
-  flutter-ios:
-    name: Flutter iOS Build
-    instance_type: mac_mini
-    max_build_duration: 120
-    environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.example.app
-      vars:
-        BUNDLE_ID: "com.example.app"
-        APP_STORE_CONNECT_ISSUER_ID: $APP_STORE_CONNECT_ISSUER_ID
-        APP_STORE_CONNECT_KEY_IDENTIFIER: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        APP_STORE_CONNECT_PRIVATE_KEY: $APP_STORE_CONNECT_PRIVATE_KEY
-      xcode: latest
-      cocoapods: default
-    scripts:
-      - name: Get Flutter packages
-        script: |
-          flutter pub get
-      - name: Run Flutter tests
-        script: |
-          flutter test
-      - name: Build iOS app
-        script: |
-          flutter build ios --release --no-codesign
-      - name: Build and sign IPA
-        script: |
-          cd ios
-          pod install
-          xcode_project_build
-    artifacts:
-      - build/ios/ipa/*.ipa
-      - /tmp/xcodebuild_logs/*.log
-    publishing:
-      app_store_connect:
-        auth: integration
-        bundle_id: $BUNDLE_ID
-
-  flutter-android:
-    name: Flutter Android Build
+  android-build-release:
+    name: Android Release Build
     instance_type: linux
     max_build_duration: 120
     environment:
+      android_signing:
+        - keystore_reference: melody_keystore
+          key_alias: upload
+          key_password: $KEY_PASSWORD
+          store_password: $STORE_PASSWORD
       vars:
-        PACKAGE_NAME: "com.example.app"
-      flutter: stable
+        GRADLE_OPTS: "-Xmx3072m"
+        JAVA_HOME: "/opt/java/openjdk"
+      java: Java 11
     scripts:
-      - name: Get Flutter packages
+      - name: Set up environment
         script: |
-          flutter pub get
-      - name: Run Flutter tests
+          echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env
+          echo "Building Melody Android App"
+      - name: Build release APK
         script: |
-          flutter test
-      - name: Build APK
-        script: |
-          flutter build apk --release
+          ./gradlew assembleRelease --no-daemon
       - name: Build App Bundle
         script: |
-          flutter build appbundle --release
+          ./gradlew bundleRelease --no-daemon
     artifacts:
-      - build/app/outputs/apk/release/*.apk
-      - build/app/outputs/bundle/release/*.aab
+      - app/build/outputs/apk/release/*.apk
+      - app/build/outputs/bundle/release/*.aab
     publishing:
       google_play:
         credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
         track: internal
         submit_as_draft: false
+
+  android-build-debug:
+    name: Android Debug Build
+    instance_type: linux
+    max_build_duration: 60
+    environment:
+      vars:
+        GRADLE_OPTS: "-Xmx3072m"
+      java: Java 11
+    scripts:
+      - name: Set up environment
+        script: |
+          echo "GEMINI_API_KEY=$GEMINI_API_KEY" > .env
+      - name: Build debug APK
+        script: |
+          ./gradlew assembleDebug --no-daemon
+      - name: Run tests
+        script: |
+          ./gradlew test --no-daemon
+    artifacts:
+      - app/build/outputs/apk/debug/*.apk
+      - app/build/reports/tests/**
