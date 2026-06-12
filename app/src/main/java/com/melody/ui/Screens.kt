@@ -342,7 +342,14 @@ fun MainScreen(
                         topBar = {
                             @OptIn(ExperimentalMaterial3Api::class)
                             TopAppBar(
-                                title = { Text(text = "Melody", fontWeight = FontWeight.Bold) },
+                                title = { 
+                                    Text(
+                                        text = "Melody", 
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = (-0.5).sp
+                                    ) 
+                                },
                                 actions = {
                                     IconButton(onClick = { showCastSheet = true }) {
                                         Icon(Icons.Default.Cast, contentDescription = "Cast")
@@ -848,13 +855,8 @@ fun SongItem(
         label = "SongItemScale"
     )
 
-    // Expressive Asymmetric Corner Shape
-    val itemShape = RoundedCornerShape(
-        topStart = 24.dp * listSizing,
-        bottomStart = 8.dp * listSizing,
-        topEnd = 8.dp * listSizing,
-        bottomEnd = 24.dp * listSizing
-    )
+    // Expressive Lune-Style Corner Shape
+    val itemShape = RoundedCornerShape(24.dp * listSizing)
 
     Card(
         modifier = Modifier
@@ -1914,12 +1916,13 @@ fun MiniPlayer(
     )
 
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f),
         contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 4.dp,
+        tonalElevation = 8.dp,
         modifier = Modifier
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-            .clip(MaterialTheme.shapes.extraLarge)
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .clip(CircleShape)
+            .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), CircleShape)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -2058,12 +2061,7 @@ fun SettingsItem(
     trailing: @Composable (() -> Unit)? = null,
     onClick: (() -> Unit)? = null
 ) {
-    val iconShape = RoundedCornerShape(
-        topStart = 14.dp,
-        bottomStart = 6.dp,
-        topEnd = 6.dp,
-        bottomEnd = 14.dp
-    )
+    val iconShape = CircleShape
     
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
@@ -2150,12 +2148,7 @@ fun SettingsItem(
 
 @Composable
 fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
-    val groupShape = RoundedCornerShape(
-        topStart = 28.dp,
-        bottomStart = 12.dp,
-        topEnd = 12.dp,
-        bottomEnd = 28.dp
-    )
+    val groupShape = RoundedCornerShape(32.dp)
     Column(modifier = Modifier.padding(bottom = 24.dp)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -3071,9 +3064,9 @@ fun MelodyButton(
     } else {
         Button(
             onClick = onClick,
-            modifier = modifier.height(48.dp),
+            modifier = modifier.height(56.dp),
             colors = if (tint != Color.Unspecified) ButtonDefaults.buttonColors(containerColor = tint) else ButtonDefaults.buttonColors(),
-            shape = RoundedCornerShape(12.dp)
+            shape = CircleShape
         ) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
