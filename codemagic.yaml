@@ -6,6 +6,7 @@ workflows:
     environment:
       vars:
         GRADLE_OPTS: "-Xmx3072m"
+        DEVELOPER_EMAIL: "developer@example.com"
       java: Java 11
     scripts:
       - name: Set up environment
