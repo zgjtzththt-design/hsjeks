@@ -23,8 +23,27 @@ class ThemeViewModel(application: Application) : AndroidViewModel(application) {
     private val _albumArtShape = MutableStateFlow(prefs.getInt("album_art_shape", 0))
     val albumArtShape: StateFlow<Int> = _albumArtShape
 
-    private val _useLiquidButtons = MutableStateFlow(prefs.getBoolean("use_liquid_buttons", false))
+    private val _useLiquidButtons = MutableStateFlow(prefs.getBoolean("use_liquid_buttons", true))
     val useLiquidButtons: StateFlow<Boolean> = _useLiquidButtons
+
+    // Liquid Glass Theme settings
+    private val _useLiquidGlass = MutableStateFlow(prefs.getBoolean("use_liquid_glass", true))
+    val useLiquidGlass: StateFlow<Boolean> = _useLiquidGlass
+
+    private val _liquidGlassPreset = MutableStateFlow(prefs.getString("liquid_glass_preset", "crystal_ice") ?: "crystal_ice")
+    val liquidGlassPreset: StateFlow<String> = _liquidGlassPreset
+
+    private val _liquidGlassBlur = MutableStateFlow(prefs.getFloat("liquid_glass_blur", 24f))
+    val liquidGlassBlur: StateFlow<Float> = _liquidGlassBlur
+
+    private val _liquidGlassOpacity = MutableStateFlow(prefs.getFloat("liquid_glass_opacity", 0.72f))
+    val liquidGlassOpacity: StateFlow<Float> = _liquidGlassOpacity
+
+    private val _liquidGlassShine = MutableStateFlow(prefs.getBoolean("liquid_glass_shine", true))
+    val liquidGlassShine: StateFlow<Boolean> = _liquidGlassShine
+
+    private val _liquidAmbientOrbs = MutableStateFlow(prefs.getBoolean("liquid_ambient_orbs", false))
+    val liquidAmbientOrbs: StateFlow<Boolean> = _liquidAmbientOrbs
 
     // New values for list sizing, opacity, background, and fonts
     private val _listSizing = MutableStateFlow(prefs.getFloat("list_sizing", 1.0f))
@@ -65,6 +84,36 @@ class ThemeViewModel(application: Application) : AndroidViewModel(application) {
     fun setUseLiquidButtons(enabled: Boolean) {
         _useLiquidButtons.value = enabled
         prefs.edit().putBoolean("use_liquid_buttons", enabled).apply()
+    }
+
+    fun setUseLiquidGlass(enabled: Boolean) {
+        _useLiquidGlass.value = enabled
+        prefs.edit().putBoolean("use_liquid_glass", enabled).apply()
+    }
+
+    fun setLiquidGlassPreset(preset: String) {
+        _liquidGlassPreset.value = preset
+        prefs.edit().putString("liquid_glass_preset", preset).apply()
+    }
+
+    fun setLiquidGlassBlur(blur: Float) {
+        _liquidGlassBlur.value = blur
+        prefs.edit().putFloat("liquid_glass_blur", blur).apply()
+    }
+
+    fun setLiquidGlassOpacity(opacity: Float) {
+        _liquidGlassOpacity.value = opacity
+        prefs.edit().putFloat("liquid_glass_opacity", opacity).apply()
+    }
+
+    fun setLiquidGlassShine(enabled: Boolean) {
+        _liquidGlassShine.value = enabled
+        prefs.edit().putBoolean("liquid_glass_shine", enabled).apply()
+    }
+
+    fun setLiquidAmbientOrbs(enabled: Boolean) {
+        _liquidAmbientOrbs.value = enabled
+        prefs.edit().putBoolean("liquid_ambient_orbs", enabled).apply()
     }
 
     fun setListSizing(value: Float) {

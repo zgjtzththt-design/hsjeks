@@ -2,6 +2,7 @@ package com.melody.ui
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import com.melody.ui.components.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -276,7 +277,7 @@ fun MainScreen(
                 CastBottomSheet(onDismiss = { showCastSheet = false })
             }
 
-            val pagerState = rememberPagerState(pageCount = { 4 })
+            val pagerState = rememberPagerState(pageCount = { 3 })
             val coroutineScope = rememberCoroutineScope()
 
             val showVolumeBar by musicViewModel.showVolumeBar.collectAsState()
@@ -316,6 +317,11 @@ fun MainScreen(
 
                     val context = androidx.compose.ui.platform.LocalContext.current
                     val customBackgroundPath by themeViewModel.customBackgroundPath.collectAsState()
+                    val useLiquidGlass by themeViewModel.useLiquidGlass.collectAsState()
+                    val liquidGlassPreset by themeViewModel.liquidGlassPreset.collectAsState()
+                    val liquidAmbientOrbs by themeViewModel.liquidAmbientOrbs.collectAsState()
+                    val dominantColor by musicViewModel.dominantColor.collectAsState()
+                    val audioAmplitude by musicViewModel.audioAmplitude.collectAsState()
                     
                     Box(modifier = Modifier.fillMaxSize()) {
                         if (customBackgroundPath != null) {
@@ -343,12 +349,27 @@ fun MainScreen(
                             @OptIn(ExperimentalMaterial3Api::class)
                             TopAppBar(
                                 title = { 
-                                    Text(
-                                        text = "Melody", 
-                                        style = MaterialTheme.typography.headlineMedium,
-                                        fontWeight = FontWeight.Black,
-                                        letterSpacing = (-0.5).sp
-                                    ) 
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(text = "Melody", fontWeight = FontWeight.ExtraBold)
+                                        if (useLiquidGlass) {
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Surface(
+                                                shape = RoundedCornerShape(12.dp),
+                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
+                                            ) {
+                                                Text(
+                                                    "LIQUID GLASS",
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                    style = MaterialTheme.typography.labelSmall.copy(
+                                                        fontWeight = FontWeight.Bold,
+                                                        letterSpacing = 1.sp
+                                                    ),
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        }
+                                    }
                                 },
                                 actions = {
                                     IconButton(onClick = { showCastSheet = true }) {
@@ -377,148 +398,14 @@ fun MainScreen(
                                 onClick = { showPlayer = true }
                             )
                         }
-                        val tabShape = androidx.compose.foundation.shape.RoundedCornerShape(32.dp)
-                        androidx.compose.foundation.layout.Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .navigationBarsPadding()
-                                .padding(start = 24.dp, end = 24.dp, bottom = 20.dp, top = 8.dp)
-                                .height(64.dp)
-                                .background(
-                                    MaterialTheme.colorScheme.surfaceContainerHigh,
-                                    shape = tabShape
-                                )
-                                .border(
-                                    width = 1.dp,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                                    shape = tabShape
-                                )
-                        ) {
-                            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                                val barWidth = maxWidth
-                                val tabCount = 4
-                                val tabWidth = barWidth / tabCount
-
-                                val targetFraction by remember {
-                                    derivedStateOf { pagerState.currentPage.toFloat() }
-                                }
-                                val animatedFraction by animateFloatAsState(
-                                    targetValue = targetFraction,
-                                    animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioLowBouncy,
-                                        stiffness = Spring.StiffnessMediumLow
-                                    ),
-                                    label = "LiquidTabIndicator"
-                                )
-
-                                val diff = abs(targetFraction - animatedFraction)
-                                val scaleXFactor = 1f + (diff * 0.22f).coerceIn(0f, 0.35f)
-                                val scaleYFactor = 1f - (diff * 0.08f).coerceIn(0f, 0.15f)
-
-                                Box(
-                                    modifier = Modifier
-                                        .offset(
-                                            x = tabWidth * animatedFraction + (tabWidth * (1f - scaleXFactor) / 2f)
-                                        )
-                                        .width(tabWidth * scaleXFactor)
-                                        .fillMaxHeight()
-                                        .padding(vertical = 6.dp, horizontal = 12.dp)
-                                        .graphicsLayer {
-                                            scaleY = scaleYFactor
-                                        }
-                                        .background(
-                                            brush = Brush.horizontalGradient(
-                                                colors = listOf(
-                                                    MaterialTheme.colorScheme.primary,
-                                                    MaterialTheme.colorScheme.secondary
-                                                )
-                                            ),
-                                            shape = RoundedCornerShape(24.dp)
-                                        )
-                                )
-
-                                Row(
-                                    modifier = Modifier.fillMaxSize(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    val tabsList = listOf(
-                                        0 to ("Library" to Icons.Filled.LibraryMusic to Icons.Outlined.LibraryMusic),
-                                        1 to ("Folders" to Icons.Filled.Folder to Icons.Outlined.Folder),
-                                        2 to ("Focus" to Icons.Filled.Timer to Icons.Outlined.Timer),
-                                        3 to ("Settings" to Icons.Filled.Settings to Icons.Outlined.Settings)
-                                    )
-                                    tabsList.forEach { (page, info) ->
-                                        val (textAndIcons, inactiveIcon) = info
-                                        val (label, activeIcon) = textAndIcons
-                                        val isSelected = pagerState.currentPage == page
-
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .fillMaxHeight()
-                                                .clickable(
-                                                    interactionSource = remember { MutableInteractionSource() },
-                                                    indication = null
-                                                ) {
-                                                    coroutineScope.launch {
-                                                        pagerState.animateScrollToPage(page)
-                                                    }
-                                                }
-                                                .testTag("nav_tab_${label.lowercase()}"),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.Center,
-                                                modifier = Modifier.padding(horizontal = 4.dp)
-                                            ) {
-                                                val iconScale by animateFloatAsState(
-                                                    targetValue = if (isSelected) 1.2f else 1.0f,
-                                                    animationSpec = spring(
-                                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                        stiffness = Spring.StiffnessMedium
-                                                    ),
-                                                    label = "IconScale"
-                                                )
-                                                Icon(
-                                                    imageVector = if (isSelected) activeIcon else inactiveIcon,
-                                                    contentDescription = label,
-                                                    tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
-                                                    modifier = Modifier
-                                                        .size(24.dp)
-                                                        .graphicsLayer {
-                                                            scaleX = iconScale
-                                                            scaleY = iconScale
-                                                        }
-                                                )
-                                                
-                                                AnimatedVisibility(
-                                                    visible = isSelected,
-                                                    enter = expandHorizontally(
-                                                        expandFrom = Alignment.End,
-                                                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                                                    ) + fadeIn(animationSpec = tween(150)),
-                                                    exit = shrinkHorizontally(
-                                                        shrinkTowards = Alignment.End,
-                                                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                                                    ) + fadeOut(animationSpec = tween(150))
-                                                ) {
-                                                    Text(
-                                                        text = label,
-                                                        color = MaterialTheme.colorScheme.onPrimary,
-                                                        style = MaterialTheme.typography.labelLarge.copy(
-                                                            fontWeight = FontWeight.Bold,
-                                                            letterSpacing = 0.5.sp
-                                                        ),
-                                                        modifier = Modifier.padding(start = 8.dp)
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
+                        LiquidGlassNavBar(
+                            selectedTab = pagerState.currentPage,
+                            onTabSelected = { page ->
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(page)
                                 }
                             }
-                        }
+                        )
                     }
                 }
             ) { paddingValues ->
@@ -546,12 +433,7 @@ fun MainScreen(
                             contentPadding = paddingValues,
                             themeViewModel = themeViewModel
                         )
-                        2 -> FocusScreen(
-                            themeViewModel = themeViewModel,
-                            musicViewModel = musicViewModel,
-                            contentPadding = paddingValues
-                        )
-                        3 -> SettingsScreen(
+                        2 -> SettingsScreen(
                             viewModel = themeViewModel,
                             contentPadding = paddingValues
                         )
@@ -620,53 +502,70 @@ fun SongList(
         Color.Transparent
     }
     
-    Column {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = contentPadding.calculateTopPadding())
+    ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(horizontal = 16.dp, vertical = 6.dp)
         ) {
-            TextField(
-                value = searchQuery,
-                onValueChange = onSearchQueryChange,
+            LiquidGlassCard(
                 modifier = Modifier
                     .weight(1f)
-                    .height(52.dp)
-                    .testTag("song_search_field"),
-                placeholder = { Text("Search library...", style = MaterialTheme.typography.bodyMedium) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { onSearchQueryChange("") }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(18.dp))
-                        }
-                    }
-                },
-                singleLine = true,
-                textStyle = MaterialTheme.typography.bodyMedium,
+                    .height(52.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = TextFieldDefaults.colors(
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    disabledIndicatorColor = Color.Transparent,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                blurRadius = 16.dp,
+                opacity = if (androidx.compose.foundation.isSystemInDarkTheme()) 0.15f else 0.35f,
+                shineAlpha = 0.2f
+            ) {
+                TextField(
+                    value = searchQuery,
+                    onValueChange = onSearchQueryChange,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("song_search_field"),
+                    placeholder = { Text("Search library...", style = MaterialTheme.typography.bodyMedium) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { onSearchQueryChange("") }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        disabledIndicatorColor = Color.Transparent,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent
+                    )
                 )
-            )
+            }
             
             if (bluetoothDevices.isNotEmpty()) {
                 Spacer(modifier = Modifier.width(8.dp))
-                IconButton(
+                LiquidGlassIconButton(
                     onClick = { showEarbudsDialog = true },
-                    modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
-                ) {
-                    Icon(
-                        androidx.compose.material.icons.Icons.Rounded.Headphones, 
-                        contentDescription = "Earbuds",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
+                    modifier = Modifier.size(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                    content = {
+                        Icon(
+                            androidx.compose.material.icons.Icons.Rounded.Headphones, 
+                            contentDescription = "Earbuds",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                )
             }
         }
         
@@ -756,9 +655,9 @@ fun SongList(
             LazyColumn(
                 state = listState,
                 contentPadding = PaddingValues(
-                    bottom = contentPadding.calculateBottomPadding() + 8.dp,
+                    bottom = contentPadding.calculateBottomPadding() + 16.dp,
                     start = 16.dp,
-                    top = if (customBackgroundPath != null) 12.dp else contentPadding.calculateTopPadding(),
+                    top = 4.dp,
                     end = 16.dp
                 )
             ) {
@@ -847,70 +746,35 @@ fun SongItem(
     
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.92f else 1f,
+        targetValue = if (isPressed) 0.94f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
+            stiffness = Spring.StiffnessLow
         ),
         label = "SongItemScale"
     )
 
-    // Expressive Lune-Style Corner Shape
-    val itemShape = RoundedCornerShape(24.dp * listSizing)
-
-    Card(
+    LiquidGlassCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = (3.dp * listSizing))
+            .padding(vertical = (3.dp * listSizing), horizontal = 2.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
-            }
-            .clickable { 
-                isPressed = true
-                onClick()
-            }
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                shape = itemShape
-            ),
-        shape = itemShape,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
-            contentColor = MaterialTheme.colorScheme.onSurface
-        )
+            },
+        shape = RoundedCornerShape(18.dp),
+        blurRadius = 16.dp,
+        opacity = if (androidx.compose.foundation.isSystemInDarkTheme()) 0.12f else 0.28f,
+        shineAlpha = 0.25f,
+        onClick = {
+            isPressed = true
+            onClick()
+        }
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Elegant vertical accent block on the left representing active state guide
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .height(32.dp * listSizing)
-                    .background(
-                        color = MaterialTheme.colorScheme.primary,
-                        shape = RoundedCornerShape(2.dp)
-                    )
-            )
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // Leading Album Art
-            AlbumArt(song.albumArtUri, imageSize, artShape)
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            // Titles
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
+        ListItem(
+            headlineContent = { 
                 Text(
-                    text = song.title, 
+                    song.title, 
                     fontWeight = FontWeight.Bold, 
                     maxLines = 1, 
                     overflow = TextOverflow.Ellipsis,
@@ -918,38 +782,22 @@ fun SongItem(
                         fontSize = (if (isCompact) 14.sp else 16.sp) * listSizing
                     )
                 ) 
-                
-                Spacer(modifier = Modifier.height(2.dp))
-
+            },
+            supportingContent = { 
                 Text(
-                    text = "${song.artist} • ${song.album}", 
+                    "${song.artist} • ${song.album}", 
                     maxLines = 1, 
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                     style = (if (isCompact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall).copy(
-                        fontSize = (if (isCompact) 10.sp else 12.sp) * listSizing
+                        fontSize = (if (isCompact) 11.sp else 12.sp) * listSizing
                     )
                 ) 
-            }
-
-            // High aesthetic M3 Expressive play detail button
-            IconButton(
-                onClick = onClick,
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f),
-                        shape = CircleShape
-                    )
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.PlayArrow,
-                    contentDescription = "Play",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        }
+            },
+            leadingContent = {
+                AlbumArt(song.albumArtUri, imageSize, artShape)
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+        )
     }
     
     LaunchedEffect(isPressed) {
@@ -1022,68 +870,33 @@ fun PlaylistList(
                 )
             ) {
                 items(playlists, key = { it.id }) { playlist ->
-                    val playlistShape = RoundedCornerShape(topStart = 12.dp, topEnd = 28.dp, bottomStart = 28.dp, bottomEnd = 12.dp)
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 6.dp)
-                            .border(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                                shape = playlistShape
-                            ),
-                        shape = playlistShape,
+                            .padding(vertical = 4.dp),
+                        shape = MaterialTheme.shapes.large,
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                             contentColor = MaterialTheme.colorScheme.onSurface
                         )
                     ) {
                         ListItem(
-                            headlineContent = { 
-                                Text(
-                                    text = playlist.name, 
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.bodyLarge
-                                ) 
-                            },
-                            supportingContent = { 
-                                Text(
-                                    text = "قائمة تشغيل مخصصة | Playlist", 
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                                ) 
-                            },
+                            headlineContent = { Text(playlist.name, fontWeight = FontWeight.Bold) },
+                            supportingContent = { Text("Playlist", style = MaterialTheme.typography.bodySmall) },
                             leadingContent = {
                                 Surface(
-                                    modifier = Modifier.size(52.dp),
-                                    shape = RoundedCornerShape(16.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+                                    modifier = Modifier.size(48.dp),
+                                    shape = MaterialTheme.shapes.medium,
+                                    color = MaterialTheme.colorScheme.primaryContainer
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = Icons.Default.PlaylistPlay, 
-                                            contentDescription = null, 
-                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                            modifier = Modifier.size(28.dp)
-                                        )
+                                        Icon(Icons.Default.PlaylistPlay, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
                                     }
                                 }
                             },
                             trailingContent = {
-                                IconButton(
-                                    onClick = { onDeletePlaylist(playlist) },
-                                    modifier = Modifier
-                                        .background(
-                                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f),
-                                            shape = CircleShape
-                                        )
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete, 
-                                        contentDescription = "Delete", 
-                                        tint = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                IconButton(onClick = { onDeletePlaylist(playlist) }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
                                 }
                             },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
@@ -1249,6 +1062,7 @@ fun PlayerScreen(
     val audioAmplitude by musicViewModel.audioAmplitude.collectAsState()
     
     var showAlbumMenu by remember { mutableStateOf(false) }
+    var showEqualizerDialog by remember { mutableStateOf(false) }
     var enableRain by remember { mutableStateOf(false) }
     var enableBeatBounce by remember { mutableStateOf(false) }
     var enableRhythmicFolder by remember { mutableStateOf(false) }
@@ -1321,20 +1135,7 @@ fun PlayerScreen(
         label = "BeatPulse"
     )
 
-    val rhythmScale by remember(audioAmplitude, enableBeatBounce, isPlaying) {
-        derivedStateOf { if (enableBeatBounce && isPlaying) (1f + audioAmplitude * 0.2f) else 1f }
-    }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "PulseTransition")
-    val animatedAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.1f,
-        targetValue = 0.4f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(4000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "ColorPulse"
-    )
+    val rhythmScale = if (enableBeatBounce && isPlaying) (1f + audioAmplitude * 0.2f) else 1f
 
     Surface(
         color = MaterialTheme.colorScheme.background,
@@ -1348,7 +1149,7 @@ fun PlayerScreen(
                     .background(
                         Brush.radialGradient(
                             colors = listOf(
-                                dominantColor.copy(alpha = animatedAlpha),
+                                dominantColor.copy(alpha = 0.22f),
                                 Color.Transparent
                             ),
                             center = Offset(0.5f, 0.8f),
@@ -1365,13 +1166,36 @@ fun PlayerScreen(
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onDismiss) {
                         Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Back", modifier = Modifier.size(32.dp))
                     }
-                    IconButton(onClick = { musicViewModel.setVolumeLevel(300) }) {
-                        Icon(Icons.Default.VolumeUp, contentDescription = "Enhanced Audio", modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { showEqualizerDialog = true }) {
+                            Icon(
+                                Icons.Rounded.Equalizer, 
+                                contentDescription = "Glass Equalizer", 
+                                modifier = Modifier.size(26.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        IconButton(onClick = { showAlbumMenu = true }) {
+                            Icon(
+                                Icons.Rounded.AutoAwesome, 
+                                contentDescription = "Visual Effects", 
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        IconButton(onClick = { musicViewModel.setVolumeLevel(300) }) {
+                            Icon(
+                                Icons.Default.VolumeUp, 
+                                contentDescription = "Enhanced Audio", 
+                                modifier = Modifier.size(24.dp), 
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
 
@@ -1493,6 +1317,16 @@ fun PlayerScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                LiquidAudioWaveVisualizer(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(36.dp),
+                    barCount = 36,
+                    amplitude = audioAmplitude,
+                    isPlaying = isPlaying,
+                    tint = dominantColor
                 )
             }
 
@@ -1634,6 +1468,15 @@ fun PlayerScreen(
             
             Spacer(modifier = Modifier.weight(1f))
         }
+
+        if (showEqualizerDialog) {
+            val volumeLevel by musicViewModel.volumeLevel.collectAsState()
+            LiquidEqualizerDialog(
+                onDismiss = { showEqualizerDialog = false },
+                currentGainBoost = volumeLevel,
+                onGainChange = { musicViewModel.setVolumeLevel(it) }
+            )
+        }
     }
 }
 }
@@ -1769,7 +1612,53 @@ fun FolderList(
         MaterialTheme.colorScheme.surfaceContainerHigh
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = contentPadding.calculateTopPadding())
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+        ) {
+            LiquidGlassCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(16.dp),
+                blurRadius = 16.dp,
+                opacity = if (androidx.compose.foundation.isSystemInDarkTheme()) 0.15f else 0.35f,
+                shineAlpha = 0.2f
+            ) {
+                TextField(
+                    value = searchQuery,
+                    onValueChange = onSearchQueryChange,
+                    modifier = Modifier.fillMaxSize(),
+                    placeholder = { Text("Search folders...", style = MaterialTheme.typography.bodyMedium) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { onSearchQueryChange("") }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        disabledIndicatorColor = Color.Transparent,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent
+                    )
+                )
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -1793,64 +1682,28 @@ fun FolderList(
             LazyColumn(
                 contentPadding = PaddingValues(
                     bottom = contentPadding.calculateBottomPadding() + 16.dp,
-                    top = if (customBackgroundPath != null) 32.dp else contentPadding.calculateTopPadding() + 16.dp,
+                    top = 4.dp,
                     start = 16.dp, 
                     end = 16.dp
                 ),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                item {
-                    TextField(
-                        value = searchQuery,
-                        onValueChange = onSearchQueryChange,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        placeholder = { Text("Search folders...", style = MaterialTheme.typography.bodyMedium) },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                        trailingIcon = {
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { onSearchQueryChange("") }) {
-                                    Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(18.dp))
-                                }
-                            }
-                        },
-                        singleLine = true,
-                        textStyle = MaterialTheme.typography.bodyMedium,
-                        shape = RoundedCornerShape(16.dp),
-                        colors = TextFieldDefaults.colors(
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            disabledIndicatorColor = Color.Transparent,
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    )
-                }
-
                 folders.forEach { (path, folderSongs) ->
                     item(key = path) {
-                        val folderShape = RoundedCornerShape(topStart = 28.dp, bottomEnd = 28.dp, topEnd = 12.dp, bottomStart = 12.dp)
-                        Card(
+                        LiquidGlassCard(
                             onClick = { /* Folder detail browsing */ },
-                            shape = folderShape,
-                            colors = CardDefaults.cardColors(
-                                containerColor = cardBgColor.copy(alpha = 0.6f),
-                                contentColor = MaterialTheme.colorScheme.onSurface
-                            ),
+                            shape = RoundedCornerShape(20.dp),
+                            blurRadius = 18.dp,
+                            opacity = if (androidx.compose.foundation.isSystemInDarkTheme()) 0.14f else 0.32f,
+                            shineAlpha = 0.3f,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = (3.dp * listSizing))
-                                .border(
-                                    width = 1.dp,
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                                    shape = folderShape
-                                )
                         ) {
                             ListItem(
                                 headlineContent = { 
                                     Text(
-                                        text = path.substringAfterLast("/"), 
+                                        path.substringAfterLast("/"), 
                                         fontWeight = FontWeight.Bold,
                                         style = (if (useCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge).copy(
                                             fontSize = (if (useCompact) 14.sp else 16.sp) * listSizing
@@ -1859,35 +1712,27 @@ fun FolderList(
                                 },
                                 supportingContent = { 
                                     Text(
-                                        text = "${folderSongs.size} tracks • $path", 
+                                        "${folderSongs.size} songs • $path", 
                                         style = MaterialTheme.typography.bodySmall.copy(
-                                            fontSize = 11.sp * listSizing
-                                        ),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                            fontSize = 12.sp * listSizing
+                                        )
                                     ) 
                                 },
                                 leadingContent = { 
                                     Surface(
-                                        shape = RoundedCornerShape(14.dp),
-                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
+                                        shape = MaterialTheme.shapes.medium,
+                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
                                         modifier = Modifier.size((if (useCompact) 40.dp else 48.dp) * listSizing)
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
                                             Icon(
-                                                imageVector = Icons.Default.Folder, 
+                                                Icons.Default.Folder, 
                                                 contentDescription = null, 
                                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                                 modifier = Modifier.size((if (useCompact) 20.dp else 24.dp) * listSizing)
                                             )
                                         }
                                     }
-                                },
-                                trailingContent = {
-                                    Icon(
-                                        imageVector = Icons.Default.ChevronRight,
-                                        contentDescription = "Details",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                    )
                                 },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                             )
@@ -1910,35 +1755,31 @@ fun MiniPlayer(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.96f else 1f,
+        targetValue = if (isPressed) 0.97f else 1f,
         animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow),
         label = "MiniPlayerScale"
     )
 
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f),
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 8.dp,
+    LiquidGlassCard(
         modifier = Modifier
-            .padding(horizontal = 14.dp, vertical = 8.dp)
-            .clip(CircleShape)
-            .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), CircleShape)
+            .padding(horizontal = 14.dp, vertical = 6.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
-            }
-            .clickable(
-                interactionSource = interactionSource,
-                indication = ripple(),
-                onClick = onClick
-            )
+            },
+        shape = RoundedCornerShape(26.dp),
+        blurRadius = 24.dp,
+        opacity = if (androidx.compose.foundation.isSystemInDarkTheme()) 0.22f else 0.45f,
+        shineAlpha = 0.4f,
+        tintColor = MaterialTheme.colorScheme.primary,
+        onClick = onClick
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(12.dp)
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             AlbumArt(song.albumArtUri, 48.dp, albumArtShape)
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     song.title, 
@@ -1956,32 +1797,19 @@ fun MiniPlayer(
                 )
             }
             
-            val playInteractionSource = remember { MutableInteractionSource() }
-            val isPlayPressed by playInteractionSource.collectIsPressedAsState()
-            val playScale by animateFloatAsState(
-                targetValue = if (isPlayPressed) 0.85f else 1f,
-                animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium),
-                label = "PlayBounce"
-            )
-
-            IconButton(
+            LiquidGlassIconButton(
                 onClick = onTogglePlayback,
-                interactionSource = playInteractionSource,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .graphicsLayer { scaleX = playScale; scaleY = playScale },
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    contentDescription = if (isPlaying) "Pause" else "Play",
-                    modifier = Modifier.size(28.dp)
-                )
-            }
+                modifier = Modifier.size(46.dp),
+                shape = CircleShape,
+                tint = MaterialTheme.colorScheme.primary,
+                content = {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+            )
         }
     }
 }
@@ -2061,73 +1889,29 @@ fun SettingsItem(
     trailing: @Composable (() -> Unit)? = null,
     onClick: (() -> Unit)? = null
 ) {
-    val iconShape = CircleShape
-    
-    var isPressed by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.95f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "SettingsItemScale"
-    )
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .then(
-                if (onClick != null) {
-                    Modifier.clickable {
-                        isPressed = true
-                        onClick()
-                    }
-                } else Modifier
-            )
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Surface(
-            shape = iconShape,
+            shape = RoundedCornerShape(12.dp),
             color = iconContainerColor,
-            modifier = Modifier
-                .size(42.dp)
-                .border(
-                    width = 1.dp,
-                    color = iconColor.copy(alpha = 0.15f),
-                    shape = iconShape
-                )
+            modifier = Modifier.size(40.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = icon, 
-                    contentDescription = null, 
-                    tint = iconColor, 
-                    modifier = Modifier.size(20.dp)
-                )
+                Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
             }
         }
         
         Spacer(modifier = Modifier.width(16.dp))
         
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title, 
-                style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp), 
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             if (subtitle != null) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = subtitle, 
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp), 
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                )
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         
@@ -2137,56 +1921,29 @@ fun SettingsItem(
             }
         }
     }
-    
-    LaunchedEffect(isPressed) {
-        if (isPressed) {
-            kotlinx.coroutines.delay(80)
-            isPressed = false
-        }
-    }
 }
 
 @Composable
 fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
-    val groupShape = RoundedCornerShape(32.dp)
     Column(modifier = Modifier.padding(bottom = 24.dp)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .height(18.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.primary,
-                        shape = RoundedCornerShape(2.dp)
-                    )
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = title.uppercase(),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                letterSpacing = 1.2.sp
-            )
-        }
+        Text(
+            text = title.uppercase(),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            letterSpacing = 1.2.sp
+        )
         Surface(
-            shape = groupShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 2.dp,
+            tonalElevation = 1.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp)
-                .border(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                    shape = groupShape
-                )
+                .padding(horizontal = 8.dp)
         ) {
-            Column(modifier = Modifier.padding(vertical = 8.dp)) {
+            Column {
                 content()
             }
         }
@@ -2220,45 +1977,37 @@ fun SettingsScreen(
             .padding(top = contentPadding.calculateTopPadding())
             .verticalScroll(rememberScrollState())
             .padding(
-                top = 20.dp, 
-                bottom = contentPadding.calculateBottomPadding() + 40.dp
+                top = 16.dp, 
+                bottom = contentPadding.calculateBottomPadding() + 32.dp
             )
     ) {
-        SettingsGroup(title = "Visual Essence | المظهر البصري") {
+        SettingsGroup(title = "Visual Essence") {
             SettingsItem(
-                title = "Dynamic Theming | السمات الديناميكية",
-                subtitle = "Sync interface with system wallpaper\nمزامنة ألوان الواجهة مع خلفية النظام",
+                title = "Dynamic Theming",
+                subtitle = "Sync interface with system wallpaper",
                 icon = Icons.Rounded.Palette,
                 iconContainerColor = Color(0xFF4CAF50).copy(alpha = 0.2f),
                 iconColor = Color(0xFF2E7D32),
                 trailing = {
                     Switch(
                         checked = dynamicColor,
-                        onCheckedChange = { viewModel.setDynamicColor(it) },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = MaterialTheme.colorScheme.primary,
-                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
-                        )
+                        onCheckedChange = { viewModel.setDynamicColor(it) }
                     )
                 }
             )
         }
 
-        SettingsGroup(title = "Interface Controls | واجهة التحكم") {
+        SettingsGroup(title = "Interface") {
             SettingsItem(
-                title = "Compact Mode | الوضع المضغوط",
-                subtitle = "Maximize content on screen\nعرض عناصر ومحتوى أكثر على الشاشة",
+                title = "Compact Mode",
+                subtitle = "Maximize content on screen",
                 icon = Icons.Rounded.ViewList,
                 iconContainerColor = Color(0xFFFF9800).copy(alpha = 0.2f),
                 iconColor = Color(0xFFE65100),
                 trailing = {
                     Switch(
                         checked = useCompactLayout,
-                        onCheckedChange = { viewModel.setCompactLayout(it) },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = MaterialTheme.colorScheme.secondary,
-                            checkedTrackColor = MaterialTheme.colorScheme.secondaryContainer
-                        )
+                        onCheckedChange = { viewModel.setCompactLayout(it) }
                     )
                 }
             )
@@ -2266,176 +2015,33 @@ fun SettingsScreen(
             val listSizing by viewModel.listSizing.collectAsState()
             val listOpacity by viewModel.listOpacity.collectAsState()
 
-            // Expressive styled sliders block
-            Column(
-                modifier = Modifier
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
-                        shape = RoundedCornerShape(16.dp)
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.06f),
-                        shape = RoundedCornerShape(16.dp)
-                    )
-                    .padding(14.dp)
-            ) {
-                // Slider 1: List Sizing
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Rounded.AspectRatio,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Item Sizing | حجم العناصر والخطوط", 
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Text(
-                        text = "${(listSizing * 100).toInt()}%", 
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.primary, 
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    )
-                }
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Library Item Size: ${(listSizing * 100).toInt()}%", style = MaterialTheme.typography.titleSmall)
                 Slider(
                     value = listSizing,
                     onValueChange = { viewModel.setListSizing(it) },
-                    valueRange = 0.8f..1.5f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary,
-                        inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
-                    )
+                    valueRange = 0.8f..1.5f
                 )
-                
-                Spacer(modifier = Modifier.height(14.dp))
-                
-                // Slider 2: Background Opacity
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f),
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Opacity,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.secondary,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Background Opacity | شفافية الخلفية", 
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Text(
-                        text = "${(listOpacity * 100).toInt()}%", 
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.secondary, 
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    )
-                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Background Opacity: ${(listOpacity * 100).toInt()}%", style = MaterialTheme.typography.titleSmall)
                 Slider(
                     value = listOpacity,
                     onValueChange = { viewModel.setListOpacity(it) },
-                    valueRange = 0.1f..1.0f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.secondary,
-                        activeTrackColor = MaterialTheme.colorScheme.secondary,
-                        inactiveTrackColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.24f)
-                    )
+                    valueRange = 0.1f..1.0f
                 )
-                
-                Spacer(modifier = Modifier.height(14.dp))
-                
-                // Slider 3: Font Size Scale
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f),
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Rounded.FormatSize,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.tertiary,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Font Size Scale | مقياس حجم الخط", 
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    val fontSizeScale by viewModel.fontSizeScale.collectAsState()
-                    Text(
-                        text = "${(fontSizeScale * 100).toInt()}%", 
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.tertiary, 
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    )
-                }
+                Spacer(modifier = Modifier.height(8.dp))
                 val fontSizeScale by viewModel.fontSizeScale.collectAsState()
+                Text("Font Size: ${(fontSizeScale * 100).toInt()}%", style = MaterialTheme.typography.titleSmall)
                 Slider(
                     value = fontSizeScale,
                     onValueChange = { viewModel.setFontSizeScale(it) },
-                    valueRange = 0.8f..1.5f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.tertiary,
-                        activeTrackColor = MaterialTheme.colorScheme.tertiary,
-                        inactiveTrackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.24f)
-                    )
+                    valueRange = 0.8f..1.5f
                 )
             }
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-            
             SettingsItem(
-                title = "تأثير الأزرار السائل | Liquid Theme",
+                title = "تأثير الأزرار السائل",
                 subtitle = "تفعيل مظهر وتأثير الأزرار الزجاجية السائلة التفاعلية",
                 icon = Icons.Rounded.TouchApp,
                 iconContainerColor = Color(0xFFE91E63).copy(alpha = 0.2f),
@@ -2448,48 +2054,31 @@ fun SettingsScreen(
                     )
                 }
             )
-            
             val useLiquidButtons by viewModel.useLiquidButtons.collectAsState()
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                val buttonShape = RoundedCornerShape(topStart = 16.dp, bottomEnd = 16.dp, topEnd = 6.dp, bottomStart = 6.dp)
-                Surface(
-                    shape = buttonShape,
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
-                            shape = buttonShape
-                        )
-                ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        SettingsItem(
-                            title = "Custom Font | خط مخصص",
-                            subtitle = if (customFontPath != null) "Custom TTF Font applied" else "Import custom .ttf typography",
-                            icon = Icons.Rounded.FontDownload,
-                            onClick = { fontLauncher.launch("font/ttf") },
-                            trailing = if (customFontPath != null) {
-                                { IconButton(onClick = { viewModel.clearCustomFont(context) }) { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) } }
-                            } else null
-                        )
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-                        SettingsItem(
-                            title = "Custom Background | خلفية مخصصة",
-                            subtitle = if (customBackgroundPath != null) "Vibrant image applied" else "Set custom wallpaper context",
-                            icon = Icons.Rounded.Image,
-                            onClick = { backgroundLauncher.launch("image/*") },
-                            trailing = if (customBackgroundPath != null) {
-                                { IconButton(onClick = { viewModel.clearCustomBackground(context) }) { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) } }
-                            } else null
-                        )
-                    }
-                }
+                SettingsItem(
+                    title = "Custom Font",
+                    subtitle = if (customFontPath != null) "Font applied" else "Set custom font",
+                    icon = Icons.Rounded.FontDownload,
+                    onClick = { fontLauncher.launch("font/ttf") },
+                    trailing = if (customFontPath != null) {
+                        { IconButton(onClick = { viewModel.clearCustomFont(context) }) { Icon(Icons.Default.Delete, null) } }
+                    } else null
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                SettingsItem(
+                    title = "Custom Background",
+                    subtitle = if (customBackgroundPath != null) "Background applied" else "Set custom background",
+                    icon = Icons.Rounded.Image,
+                    onClick = { backgroundLauncher.launch("image/*") },
+                    trailing = if (customBackgroundPath != null) {
+                        { IconButton(onClick = { viewModel.clearCustomBackground(context) }) { Icon(Icons.Default.Delete, null) } }
+                    } else null
+                )
                 
                 MelodyButton(
                     onClick = {
@@ -2498,7 +2087,7 @@ fun SettingsScreen(
                     useLiquid = useLiquidButtons,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp),
+                        .height(48.dp),
                     tint = MaterialTheme.colorScheme.primary
                 ) {
                     Icon(
@@ -2516,18 +2105,167 @@ fun SettingsScreen(
             }
         }
 
-        SettingsGroup(title = "Creative Canvas | أشكال الألبوم الحية") {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Album Art Geometry | هندسة غلاف الألبوم", 
-                    style = MaterialTheme.typography.titleSmall, 
-                    fontWeight = FontWeight.Bold, 
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+        val useLiquidGlass by viewModel.useLiquidGlass.collectAsState()
+        val liquidGlassPreset by viewModel.liquidGlassPreset.collectAsState()
+        val liquidGlassBlur by viewModel.liquidGlassBlur.collectAsState()
+        val liquidGlassOpacity by viewModel.liquidGlassOpacity.collectAsState()
+        val liquidGlassShine by viewModel.liquidGlassShine.collectAsState()
+        val liquidAmbientOrbs by viewModel.liquidAmbientOrbs.collectAsState()
+
+        SettingsGroup(title = "التصميم الزجاجي السائل (Liquid Glass)") {
+            SettingsItem(
+                title = "تفعيل التصميم الزجاجي الكامل",
+                subtitle = "خلفيات متدرجة متحركة، أشرطة زجاجية ومؤثرات انعكاس حية",
+                icon = Icons.Rounded.AutoAwesome,
+                iconContainerColor = Color(0xFF673AB7).copy(alpha = 0.2f),
+                iconColor = Color(0xFF9C27B0),
+                trailing = {
+                    Switch(
+                        checked = useLiquidGlass,
+                        onCheckedChange = { viewModel.setUseLiquidGlass(it) }
+                    )
+                }
+            )
+            
+            if (useLiquidGlass) {
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        "أنماط الزجاج السائل (Glass Presets)", 
+                        style = MaterialTheme.typography.titleSmall, 
+                        fontWeight = FontWeight.Bold, 
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    val presets = listOf(
+                        "aurora" to "أورورا نيون",
+                        "cosmic" to "فضاء كوني",
+                        "ocean" to "محيط عميق",
+                        "sunset" to "غروب دافئ",
+                        "emerald" to "زمردي كريستالي",
+                        "frosted" to "زجاج نقي"
+                    )
+                    
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        presets.forEach { (presetId, title) ->
+                            val isSelected = liquidGlassPreset == presetId
+                            LiquidGlassActionBtn(
+                                text = title,
+                                selected = isSelected,
+                                onClick = { viewModel.setLiquidGlassPreset(presetId) }
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("درجة التغبيش والضبابية (Blur): ${liquidGlassBlur.toInt()}dp", style = MaterialTheme.typography.titleSmall)
+                    Slider(
+                        value = liquidGlassBlur,
+                        onValueChange = { viewModel.setLiquidGlassBlur(it) },
+                        valueRange = 10f..45f
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("شفافية الزجاج (Opacity): ${(liquidGlassOpacity * 100).toInt()}%", style = MaterialTheme.typography.titleSmall)
+                    Slider(
+                        value = liquidGlassOpacity,
+                        onValueChange = { viewModel.setLiquidGlassOpacity(it) },
+                        valueRange = 0.05f..0.6f
+                    )
+                }
+                
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                
+                SettingsItem(
+                    title = "انعكاس وبريق الضوء (Shine Reflection)",
+                    subtitle = "تأثير خطوط الضوء واللمعان على حواف الزجاج",
+                    icon = Icons.Rounded.Flare,
+                    iconContainerColor = Color(0xFF00BCD4).copy(alpha = 0.2f),
+                    iconColor = Color(0xFF0097A7),
+                    trailing = {
+                        Switch(
+                            checked = liquidGlassShine,
+                            onCheckedChange = { viewModel.setLiquidGlassShine(it) }
+                        )
+                    }
                 )
-                Spacer(modifier = Modifier.height(14.dp))
+                
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                
+                SettingsItem(
+                    title = "الكرات الضوئية التفاعلية (Ambient Orbs)",
+                    subtitle = "كرات ضوئية سائلة تطفو وتتفاعل مع إيقاع الموسيقى",
+                    icon = Icons.Rounded.BlurOn,
+                    iconContainerColor = Color(0xFFFF5722).copy(alpha = 0.2f),
+                    iconColor = Color(0xFFE64A19),
+                    trailing = {
+                        Switch(
+                            checked = liquidAmbientOrbs,
+                            onCheckedChange = { viewModel.setLiquidAmbientOrbs(it) }
+                        )
+                    }
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                LiquidGlassCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    shape = RoundedCornerShape(22.dp),
+                    blurRadius = liquidGlassBlur.dp,
+                    opacity = liquidGlassOpacity,
+                    shineAlpha = if (liquidGlassShine) 0.5f else 0f,
+                    tintColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Rounded.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "معاينة بطاقة الزجاج السائل",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                "تأثير زجاجي متطور مع انكسار وانعكاس الضوء",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        SettingsGroup(title = "Creative Canvas") {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Album Art Geometry", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(16.dp))
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     AlbumArtShapes.forEachIndexed { index, shape ->
@@ -2535,24 +2273,13 @@ fun SettingsScreen(
                         Surface(
                             onClick = { viewModel.setAlbumArtShape(index) },
                             shape = shape,
-                            modifier = Modifier
-                                .size(60.dp)
-                                .border(
-                                    width = if (isSelected) 2.dp else 1.dp,
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
-                                    shape = shape
-                                ),
-                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-                            tonalElevation = if (isSelected) 6.dp else 0.dp
+                            modifier = Modifier.size(64.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            tonalElevation = if (isSelected) 8.dp else 0.dp
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 if (isSelected) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check, 
-                                        contentDescription = null, 
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        modifier = Modifier.size(16.dp)
-                                    )
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
                                 }
                             }
                         }
@@ -2563,16 +2290,11 @@ fun SettingsScreen(
             if (!dynamicColor) {
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Atmospheric Accent | اللون الأساسي", 
-                        style = MaterialTheme.typography.titleSmall, 
-                        fontWeight = FontWeight.Bold, 
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Atmospheric Accent", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(16.dp))
                     FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         val colors = listOf(
@@ -2587,18 +2309,18 @@ fun SettingsScreen(
             }
         }
         
-        SettingsGroup(title = "Information | معلومات") {
+        SettingsGroup(title = "Information") {
             SettingsItem(
-                title = "Melody Stream | ميلودي ستريم",
-                subtitle = "Stable Build 4.2.1-Expressive\nإصدار ثابت ومحسن بالكامل",
+                title = "Melody Stream",
+                subtitle = "Stable Build 4.2.1-Liquid",
                 icon = Icons.Rounded.Info,
                 iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
                 iconColor = MaterialTheme.colorScheme.onSecondaryContainer
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
             SettingsItem(
-                title = "Open Source License | رخصة مفتوحة",
-                subtitle = "Inspired by HyperBridge Project\nمستوحى من مشروع هايبربريدج",
+                title = "Open Source License",
+                subtitle = "Inspired by HyperBridge Project",
                 icon = Icons.Rounded.Code,
                 iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
                 iconColor = MaterialTheme.colorScheme.onTertiaryContainer
@@ -2739,24 +2461,16 @@ fun BluetoothBatterySheet(musicViewModel: MusicViewModel, onDismiss: () -> Unit)
                     modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)
                 ) {
                     items(devices) { device ->
-                        val deviceShape = RoundedCornerShape(14.dp, 24.dp, 14.dp, 24.dp)
                         Surface(
-                            onClick = { /* Clicking could trigger connect */ },
-                            shape = deviceShape,
-                            color = if (device.isConnected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                            modifier = Modifier
-                                .padding(vertical = 6.dp)
-                                .fillMaxWidth()
-                                .border(
-                                    width = 1.dp,
-                                    color = if (device.isConnected) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.08f),
-                                    shape = deviceShape
-                                )
+                            onClick = { /* Clicking could potentially trigger connect, but usually system handles it */ },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (device.isConnected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else Color.Transparent,
+                            modifier = Modifier.padding(vertical = 4.dp)
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                    .padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(
@@ -2764,7 +2478,7 @@ fun BluetoothBatterySheet(musicViewModel: MusicViewModel, onDismiss: () -> Unit)
                                     modifier = Modifier
                                         .size(48.dp)
                                         .background(
-                                            if (device.isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), 
+                                            if (device.isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant, 
                                             CircleShape
                                         )
                                 ) {
@@ -2772,7 +2486,7 @@ fun BluetoothBatterySheet(musicViewModel: MusicViewModel, onDismiss: () -> Unit)
                                         imageVector = if (device.name.lowercase().contains("headphones") || device.name.lowercase().contains("earbuds")) 
                                             Icons.Default.Headset else Icons.Default.Bluetooth,
                                         contentDescription = null,
-                                        tint = if (device.isConnected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
+                                        tint = if (device.isConnected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                                 
@@ -2780,38 +2494,26 @@ fun BluetoothBatterySheet(musicViewModel: MusicViewModel, onDismiss: () -> Unit)
                                 
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = device.name, 
+                                        device.name, 
                                         style = MaterialTheme.typography.bodyLarge, 
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = if (device.isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                     )
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         if (device.isConnected) {
                                             Text(
-                                                text = "Connected • ", 
+                                                "Connected • ", 
                                                 style = MaterialTheme.typography.labelSmall, 
                                                 color = MaterialTheme.colorScheme.primary,
-                                                fontWeight = FontWeight.ExtraBold
+                                                fontWeight = FontWeight.Bold
                                             )
                                         }
-                                        Text(
-                                            text = device.address, 
-                                            style = MaterialTheme.typography.bodySmall, 
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                                        )
+                                        Text(device.address, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                 }
 
                                 if (device.batteryLevel != null) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier
-                                            .background(
-                                                color = if (device.batteryLevel > 20) Color.Green.copy(alpha = 0.12f) else Color.Red.copy(alpha = 0.12f),
-                                                shape = RoundedCornerShape(8.dp)
-                                            )
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                    ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
                                         Icon(
                                             imageVector = if (device.batteryLevel > 20) Icons.Default.BatteryFull else Icons.Default.BatteryAlert,
                                             contentDescription = null,
@@ -2819,11 +2521,7 @@ fun BluetoothBatterySheet(musicViewModel: MusicViewModel, onDismiss: () -> Unit)
                                             tint = if (device.batteryLevel > 20) Color.Green else Color.Red
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = "${device.batteryLevel}%", 
-                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                            color = if (device.batteryLevel > 20) Color.Green else Color.Red
-                                        )
+                                        Text("${device.batteryLevel}%", style = MaterialTheme.typography.bodyMedium)
                                     }
                                 }
                             }
@@ -3064,9 +2762,9 @@ fun MelodyButton(
     } else {
         Button(
             onClick = onClick,
-            modifier = modifier.height(56.dp),
+            modifier = modifier.height(48.dp),
             colors = if (tint != Color.Unspecified) ButtonDefaults.buttonColors(containerColor = tint) else ButtonDefaults.buttonColors(),
-            shape = CircleShape
+            shape = RoundedCornerShape(12.dp)
         ) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
