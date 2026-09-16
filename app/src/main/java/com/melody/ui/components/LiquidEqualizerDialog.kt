@@ -171,12 +171,16 @@ fun LiquidEqualizerDialog(
     val vmBandLevels = musicViewModel?.bandLevels?.collectAsState()
     val vmBassBoost = musicViewModel?.bassBoostLevel?.collectAsState()
     val vmVirtualizer = musicViewModel?.virtualizerLevel?.collectAsState()
+    val vmCrossfadeEnabled = musicViewModel?.crossfadeEnabled?.collectAsState()
+    val vmCrossfadeDuration = musicViewModel?.crossfadeDuration?.collectAsState()
 
     var isEnabled by remember { mutableStateOf(vmEqualizerEnabled?.value ?: true) }
     var selectedPresetIndex by remember { mutableIntStateOf(vmPresetIndex?.value ?: 0) }
     var bandLevels by remember { mutableStateOf(vmBandLevels?.value ?: listOf(0f, 0f, 0f, 0f, 0f)) }
     var bassBoost by remember { mutableFloatStateOf(vmBassBoost?.value ?: 0.3f) }
     var virtualizer by remember { mutableFloatStateOf(vmVirtualizer?.value ?: 0.2f) }
+    var crossfadeEnabled by remember { mutableStateOf(vmCrossfadeEnabled?.value ?: true) }
+    var crossfadeDuration by remember { mutableIntStateOf(vmCrossfadeDuration?.value ?: 4) }
     var extraGain by remember { mutableIntStateOf(currentGainBoost) }
 
     // Sync from ViewModel updates
@@ -188,6 +192,12 @@ fun LiquidEqualizerDialog(
     }
     LaunchedEffect(vmEqualizerEnabled?.value) {
         vmEqualizerEnabled?.value?.let { isEnabled = it }
+    }
+    LaunchedEffect(vmCrossfadeEnabled?.value) {
+        vmCrossfadeEnabled?.value?.let { crossfadeEnabled = it }
+    }
+    LaunchedEffect(vmCrossfadeDuration?.value) {
+        vmCrossfadeDuration?.value?.let { crossfadeDuration = it }
     }
 
     Dialog(
@@ -570,6 +580,92 @@ fun LiquidEqualizerDialog(
                                 colors = SliderDefaults.colors(
                                     thumbColor = MaterialTheme.colorScheme.secondary,
                                     activeTrackColor = MaterialTheme.colorScheme.secondary
+                                )
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Crossfade Transitions Card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isDark) Color(0xFF1F2538).copy(alpha = 0.65f)
+                        else Color.White.copy(alpha = 0.7f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Rounded.GraphicEq,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "التلاشي المتقاطع (Crossfade)",
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                    Text(
+                                        text = if (crossfadeEnabled) "انتقال ناعم (${crossfadeDuration} ثوانٍ)" else "معطل",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Switch(
+                                checked = crossfadeEnabled,
+                                onCheckedChange = {
+                                    crossfadeEnabled = it
+                                    musicViewModel?.setCrossfadeEnabled(it)
+                                },
+                                modifier = Modifier.testTag("dialog_crossfade_switch")
+                            )
+                        }
+
+                        if (crossfadeEnabled) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "مدة التلاشي",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    "${crossfadeDuration}s",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                )
+                            }
+                            Slider(
+                                value = crossfadeDuration.toFloat(),
+                                onValueChange = {
+                                    crossfadeDuration = it.toInt().coerceIn(1, 12)
+                                    musicViewModel?.setCrossfadeDuration(crossfadeDuration)
+                                },
+                                valueRange = 1f..12f,
+                                steps = 10,
+                                modifier = Modifier.fillMaxWidth().testTag("dialog_crossfade_slider"),
+                                colors = SliderDefaults.colors(
+                                    thumbColor = MaterialTheme.colorScheme.tertiary,
+                                    activeTrackColor = MaterialTheme.colorScheme.tertiary
                                 )
                             )
                         }

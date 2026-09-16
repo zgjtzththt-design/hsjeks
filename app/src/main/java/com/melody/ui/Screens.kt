@@ -398,19 +398,34 @@ fun MainScreen(
                         },
                 bottomBar = {
                     Column {
-                        if (currentSong != null) {
-                            val playbackProgress by musicViewModel.playbackProgress.collectAsState()
-                            val playbackDuration by musicViewModel.currentDuration.collectAsState()
-                            MiniPlayer(
-                                song = currentSong!!,
-                                isPlaying = isPlaying,
-                                playbackProgress = playbackProgress,
-                                playbackDuration = playbackDuration,
-                                albumArtShape = albumArtShape,
-                                onTogglePlayback = { musicViewModel.togglePlayback() },
-                                onPlayNext = { musicViewModel.playNext() },
-                                onClick = { showPlayer = true }
-                            )
+                        AnimatedVisibility(
+                            visible = currentSong != null,
+                            enter = slideInVertically(
+                                initialOffsetY = { it },
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMediumLow
+                                )
+                            ) + fadeIn(animationSpec = tween(350)),
+                            exit = slideOutVertically(
+                                targetOffsetY = { it },
+                                animationSpec = tween(250)
+                            ) + fadeOut(animationSpec = tween(200))
+                        ) {
+                            if (currentSong != null) {
+                                val playbackProgress by musicViewModel.playbackProgress.collectAsState()
+                                val playbackDuration by musicViewModel.currentDuration.collectAsState()
+                                MiniPlayer(
+                                    song = currentSong!!,
+                                    isPlaying = isPlaying,
+                                    playbackProgress = playbackProgress,
+                                    playbackDuration = playbackDuration,
+                                    albumArtShape = albumArtShape,
+                                    onTogglePlayback = { musicViewModel.togglePlayback() },
+                                    onPlayNext = { musicViewModel.playNext() },
+                                    onClick = { showPlayer = true }
+                                )
+                            }
                         }
                         LiquidGlassNavBar(
                             selectedTab = pagerState.currentPage,
@@ -455,6 +470,7 @@ fun MainScreen(
                         )
                         3 -> SettingsScreen(
                             viewModel = themeViewModel,
+                            musicViewModel = musicViewModel,
                             contentPadding = paddingValues
                         )
                     }
@@ -1082,6 +1098,9 @@ fun PlayerScreen(
     val audioAmplitude by musicViewModel.audioAmplitude.collectAsState()
     val isShuffleMode by musicViewModel.isShuffleMode.collectAsState()
     val repeatMode by musicViewModel.repeatMode.collectAsState()
+    val isCrossfading by musicViewModel.isCrossfading.collectAsState()
+    val crossfadeEnabled by musicViewModel.crossfadeEnabled.collectAsState()
+    val crossfadeDuration by musicViewModel.crossfadeDuration.collectAsState()
     
     var showAlbumMenu by remember { mutableStateOf(false) }
     var showEqualizerDialog by remember { mutableStateOf(false) }
@@ -1355,6 +1374,20 @@ fun PlayerScreen(
                             Text("Rhythmic Folder Motion", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                             Switch(checked = enableRhythmicFolder, onCheckedChange = { enableRhythmicFolder = it })
                         }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { musicViewModel.toggleCrossfade() }
+                                .padding(vertical = 12.dp)
+                        ) {
+                            Icon(Icons.Rounded.GraphicEq, contentDescription = null, modifier = Modifier.padding(end = 16.dp), tint = MaterialTheme.colorScheme.tertiary)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("التلاشي المتقاطع (Crossfade)", style = MaterialTheme.typography.bodyLarge)
+                                Text("انتقال ناعم بين المقاطع (${crossfadeDuration}s)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Switch(checked = crossfadeEnabled, onCheckedChange = { musicViewModel.setCrossfadeEnabled(it) })
+                        }
                     }
                 }
             }
@@ -1366,13 +1399,52 @@ fun PlayerScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.Start
             ) {
-                Text(
-                    song.title,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        song.title,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+
+                    AnimatedVisibility(
+                        visible = isCrossfading,
+                        enter = fadeIn() + scaleIn(),
+                        exit = fadeOut() + scaleOut()
+                    ) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.tertiaryContainer,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .testTag("player_crossfading_badge")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Rounded.GraphicEq,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(12.dp),
+                                    tint = MaterialTheme.colorScheme.onTertiaryContainer
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "Crossfade",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                                )
+                            }
+                        }
+                    }
+                }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     song.artist,
@@ -2484,6 +2556,7 @@ fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
 @Composable
 fun SettingsScreen(
     viewModel: ThemeViewModel,
+    musicViewModel: MusicViewModel? = null,
     contentPadding: PaddingValues = PaddingValues(0.dp)
 ) {
     val dynamicColor by viewModel.useDynamicColor.collectAsState()
@@ -2839,6 +2912,163 @@ fun SettingsScreen(
             }
         }
         
+        if (musicViewModel != null) {
+            val crossfadeEnabled by musicViewModel.crossfadeEnabled.collectAsState()
+            val crossfadeDuration by musicViewModel.crossfadeDuration.collectAsState()
+
+            SettingsGroup(title = "Audio & Playback (الصوت والتشغيل)") {
+                SettingsItem(
+                    title = "التلاشي المتقاطع (Crossfade)",
+                    subtitle = "انتقال صوتي ناعم وتدريجي بين الأغاني دون انقطاع مفاجئ",
+                    icon = Icons.Rounded.GraphicEq,
+                    iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    iconColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                    trailing = {
+                        Switch(
+                            checked = crossfadeEnabled,
+                            onCheckedChange = { musicViewModel.setCrossfadeEnabled(it) },
+                            modifier = Modifier.testTag("settings_crossfade_switch")
+                        )
+                    }
+                )
+
+                if (crossfadeEnabled) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "مدة التلاشي بين الأغاني",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Surface(
+                                color = MaterialTheme.colorScheme.tertiaryContainer,
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    "${crossfadeDuration} ثوانٍ",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Slider(
+                            value = crossfadeDuration.toFloat(),
+                            onValueChange = { musicViewModel.setCrossfadeDuration(it.toInt().coerceIn(1, 12)) },
+                            valueRange = 1f..12f,
+                            steps = 10,
+                            modifier = Modifier.fillMaxWidth().testTag("settings_crossfade_slider"),
+                            colors = SliderDefaults.colors(
+                                thumbColor = MaterialTheme.colorScheme.tertiary,
+                                activeTrackColor = MaterialTheme.colorScheme.tertiary
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Quick Presets
+                        val durationPresets = listOf(1, 2, 4, 6, 8, 10, 12)
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            durationPresets.forEach { dur ->
+                                val isSelected = crossfadeDuration == dur
+                                Surface(
+                                    onClick = { musicViewModel.setCrossfadeDuration(dur) },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isSelected) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier.padding(horizontal = 12.dp)
+                                    ) {
+                                        Text(
+                                            "${dur}s",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                            ),
+                                            color = if (isSelected) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Crossfade Visual Envelope Preview
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                                .padding(8.dp)
+                        ) {
+                            val curveColor = MaterialTheme.colorScheme.tertiary
+                            val incomingColor = MaterialTheme.colorScheme.primary
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val w = size.width
+                                val h = size.height
+                                
+                                val fadeOutPath = androidx.compose.ui.graphics.Path().apply {
+                                    moveTo(0f, 4f)
+                                    cubicTo(w * 0.4f, 4f, w * 0.6f, h - 4f, w, h - 4f)
+                                }
+                                drawPath(
+                                    path = fadeOutPath,
+                                    color = curveColor.copy(alpha = 0.85f),
+                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                                )
+
+                                val fadeInPath = androidx.compose.ui.graphics.Path().apply {
+                                    moveTo(0f, h - 4f)
+                                    cubicTo(w * 0.4f, h - 4f, w * 0.6f, 4f, w, 4f)
+                                }
+                                drawPath(
+                                    path = fadeInPath,
+                                    color = incomingColor.copy(alpha = 0.85f),
+                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "المقطع الحالي (تلاشي خروج)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.tertiary
+                                )
+                                Text(
+                                    "المقطع التالي (تلاشي دخول)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         SettingsGroup(title = "Information") {
             SettingsItem(
                 title = "Melody Stream",

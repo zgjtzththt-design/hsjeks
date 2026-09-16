@@ -10,6 +10,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -116,22 +118,40 @@ class MainActivity : ComponentActivity() {
               ) 
           }
 
-          if (hasSeenWelcome) {
-            MainScreen(
-              musicViewModel = musicViewModel,
-              themeViewModel = themeViewModel,
-              onNavigateToSettings = { /* Already handled by selectedTab in MainScreen */ }
-            )
-          } else {
-            WelcomeScreen(
-                onFinishOnboarding = {
-                    getSharedPreferences("melody_prefs", android.content.Context.MODE_PRIVATE)
-                        .edit()
-                        .putBoolean("has_seen_welcome", true)
-                        .apply()
-                    hasSeenWelcome = true
-                }
-            )
+          AnimatedContent(
+              targetState = hasSeenWelcome,
+              transitionSpec = {
+                  if (targetState) {
+                      (fadeIn(animationSpec = tween(500, easing = FastOutSlowInEasing)) +
+                              scaleIn(initialScale = 0.94f, animationSpec = tween(500, easing = FastOutSlowInEasing)))
+                          .togetherWith(
+                              fadeOut(animationSpec = tween(350, easing = FastOutSlowInEasing)) +
+                                      scaleOut(targetScale = 1.05f, animationSpec = tween(350, easing = FastOutSlowInEasing))
+                          )
+                  } else {
+                      (fadeIn(animationSpec = tween(400)) + scaleIn(initialScale = 1.05f))
+                          .togetherWith(fadeOut(animationSpec = tween(300)) + scaleOut(targetScale = 0.95f))
+                  }
+              },
+              label = "OnboardingToMainTransition"
+          ) { seenWelcome ->
+              if (seenWelcome) {
+                  MainScreen(
+                      musicViewModel = musicViewModel,
+                      themeViewModel = themeViewModel,
+                      onNavigateToSettings = { /* Handled by selectedTab in MainScreen */ }
+                  )
+              } else {
+                  WelcomeScreen(
+                      onFinishOnboarding = {
+                          getSharedPreferences("melody_prefs", android.content.Context.MODE_PRIVATE)
+                              .edit()
+                              .putBoolean("has_seen_welcome", true)
+                              .apply()
+                          hasSeenWelcome = true
+                      }
+                  )
+              }
           }
         } else {
             // Unify design with a gorgeous Material 3 request/fallback screen

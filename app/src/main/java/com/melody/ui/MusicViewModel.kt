@@ -29,11 +29,29 @@ import com.melody.repository.MusicRepository
 class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = MusicRepository((application as MelodyApp).database.musicDao())
 
+    private val playbackPrefs by lazy {
+        application.getSharedPreferences("playback_prefs", Context.MODE_PRIVATE)
+    }
+
     private val audioManager by lazy { application.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
     private val maxSysVolume by lazy { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) }
 
     private val _volumeLevel = MutableStateFlow(100)
     val volumeLevel: StateFlow<Int> = _volumeLevel
+
+    // Crossfade State
+    private val _crossfadeEnabled = MutableStateFlow(true)
+    val crossfadeEnabled: StateFlow<Boolean> = _crossfadeEnabled
+
+    private val _crossfadeDuration = MutableStateFlow(4) // Duration in seconds (1 to 12s)
+    val crossfadeDuration: StateFlow<Int> = _crossfadeDuration
+
+    private val _isCrossfading = MutableStateFlow(false)
+    val isCrossfading: StateFlow<Boolean> = _isCrossfading
+
+    private var fadeInJob: kotlinx.coroutines.Job? = null
+    private var isManualFading = false
+    private var isFadeInActive = false
 
     private val _showVolumeBar = MutableStateFlow(false)
     val showVolumeBar: StateFlow<Boolean> = _showVolumeBar
@@ -232,9 +250,79 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             progressJob = viewModelScope.launch {
                 while (true) {
                     syncPlaybackProgress()
-                    kotlinx.coroutines.delay(250)
+                    checkAutoCrossfade()
+                    kotlinx.coroutines.delay(120)
                 }
             }
+        } else {
+            _isCrossfading.value = false
+        }
+    }
+
+    private fun checkAutoCrossfade() {
+        if (!_crossfadeEnabled.value || isManualFading || isFadeInActive) return
+        mediaController?.let { controller ->
+            val duration = controller.duration
+            val currentPos = controller.currentPosition
+            if (duration > 1500L && controller.isPlaying) {
+                val remaining = duration - currentPos
+                val fadeWindowMs = (_crossfadeDuration.value * 1000L).coerceAtMost(duration / 2)
+                if (remaining in 50..fadeWindowMs) {
+                    val fraction = (remaining.toFloat() / fadeWindowMs).coerceIn(0.02f, 1f)
+                    val smoothVol = (1f - kotlin.math.cos(fraction * Math.PI.toFloat() / 2f)).coerceIn(0.02f, 1f)
+                    controller.volume = smoothVol
+                    _isCrossfading.value = true
+                } else if (remaining > fadeWindowMs && controller.volume < 1f && !isFadeInActive) {
+                    controller.volume = 1f
+                    _isCrossfading.value = false
+                }
+            }
+        }
+    }
+
+    private fun startSmoothFadeIn() {
+        fadeInJob?.cancel()
+        fadeInJob = viewModelScope.launch {
+            _isCrossfading.value = true
+            isFadeInActive = true
+            mediaController?.volume = 0f
+            val fadeDurationMs = (_crossfadeDuration.value * 1000L).coerceIn(500L, 3500L)
+            val stepMs = 35L
+            val steps = (fadeDurationMs / stepMs).toInt().coerceAtLeast(10)
+            for (step in 1..steps) {
+                val fraction = step.toFloat() / steps
+                val volume = (1f - kotlin.math.cos(fraction * Math.PI.toFloat() / 2f)).coerceIn(0f, 1f)
+                mediaController?.volume = volume
+                kotlinx.coroutines.delay(stepMs)
+            }
+            mediaController?.volume = 1f
+            isFadeInActive = false
+            _isCrossfading.value = false
+        }
+    }
+
+    private fun performManualTrackChange(block: () -> Unit) {
+        if (_crossfadeEnabled.value && _isPlaying.value) {
+            viewModelScope.launch {
+                isManualFading = true
+                _isCrossfading.value = true
+                val startVol = mediaController?.volume ?: 1f
+                val steps = 8
+                val stepDelay = 25L // Quick ~200ms graceful fade-out before switching
+                for (i in 1..steps) {
+                    val vol = startVol * (1f - (i.toFloat() / steps))
+                    mediaController?.volume = vol.coerceAtLeast(0f)
+                    kotlinx.coroutines.delay(stepDelay)
+                }
+                mediaController?.volume = 0f
+                block()
+                isManualFading = false
+                startSmoothFadeIn()
+            }
+        } else {
+            mediaController?.volume = 1f
+            _isCrossfading.value = false
+            block()
         }
     }
 
@@ -282,6 +370,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         viewModelScope.launch {
                             repository.incrementPlayCount(found.id)
                         }
+                    }
+                    if (_crossfadeEnabled.value && _isPlaying.value && !isManualFading) {
+                        startSmoothFadeIn()
+                    } else if (!_crossfadeEnabled.value) {
+                        mediaController?.volume = 1f
+                        _isCrossfading.value = false
                     }
                 }
             })
@@ -380,12 +474,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     .build()
             }
 
-            controller.setMediaItems(mediaItems, startIndex, 0L)
-            controller.prepare()
-            controller.play()
-            _currentSong.value = song
-            viewModelScope.launch {
-                repository.incrementPlayCount(song.id)
+            performManualTrackChange {
+                controller.setMediaItems(mediaItems, startIndex, 0L)
+                controller.prepare()
+                controller.play()
+                _currentSong.value = song
+                viewModelScope.launch {
+                    repository.incrementPlayCount(song.id)
+                }
             }
         }
     }
@@ -417,15 +513,46 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun seekTo(position: Long) {
+        fadeInJob?.cancel()
+        isFadeInActive = false
+        isManualFading = false
+        mediaController?.volume = 1f
+        _isCrossfading.value = false
         mediaController?.seekTo(position)
     }
 
     fun playNext() {
-        mediaController?.seekToNext()
+        performManualTrackChange {
+            mediaController?.seekToNext()
+        }
     }
 
     fun playPrevious() {
-        mediaController?.seekToPrevious()
+        performManualTrackChange {
+            mediaController?.seekToPrevious()
+        }
+    }
+
+    fun setCrossfadeEnabled(enabled: Boolean) {
+        _crossfadeEnabled.value = enabled
+        playbackPrefs.edit().putBoolean("crossfade_enabled", enabled).apply()
+        if (!enabled) {
+            fadeInJob?.cancel()
+            isFadeInActive = false
+            isManualFading = false
+            mediaController?.volume = 1f
+            _isCrossfading.value = false
+        }
+    }
+
+    fun setCrossfadeDuration(seconds: Int) {
+        val clamped = seconds.coerceIn(1, 12)
+        _crossfadeDuration.value = clamped
+        playbackPrefs.edit().putInt("crossfade_duration_seconds", clamped).apply()
+    }
+
+    fun toggleCrossfade() {
+        setCrossfadeEnabled(!_crossfadeEnabled.value)
     }
 
     fun clearHistory() {
