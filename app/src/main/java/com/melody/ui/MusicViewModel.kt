@@ -12,6 +12,8 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.melody.MelodyApp
+import com.melody.data.CacheManager
+import com.melody.data.PreloadManager
 import com.melody.data.Song
 import com.melody.service.PlaybackService
 import com.google.common.util.concurrent.ListenableFuture
@@ -38,6 +40,17 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _volumeLevel = MutableStateFlow(100)
     val volumeLevel: StateFlow<Int> = _volumeLevel
+
+    // Preload & Cache Management
+    val preloadManager = PreloadManager(application)
+    val isPrebuffering: StateFlow<Boolean> = preloadManager.isPrebuffering
+    val prebufferedSongId: StateFlow<String?> = preloadManager.prebufferedSongId
+
+    private val _cacheSizeMb = MutableStateFlow(0L)
+    val cacheSizeMb: StateFlow<Long> = _cacheSizeMb
+
+    private val _activeContextSongs = MutableStateFlow<List<Song>>(emptyList())
+    val activeContextSongs: StateFlow<List<Song>> = _activeContextSongs
 
     // Crossfade State
     private val _crossfadeEnabled = MutableStateFlow(true)
@@ -364,12 +377,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
                 override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                     val found = _songs.value.find { it.id == mediaItem?.mediaId }
+                        ?: _activeContextSongs.value.find { it.id == mediaItem?.mediaId }
                     _currentSong.value = found
                     syncPlaybackProgress()
                     if (found != null) {
                         viewModelScope.launch {
                             repository.incrementPlayCount(found.id)
                         }
+                        triggerNextSongPreload(found)
                     }
                     if (_crossfadeEnabled.value && _isPlaying.value && !isManualFading) {
                         startSmoothFadeIn()
@@ -377,6 +392,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         mediaController?.volume = 1f
                         _isCrossfading.value = false
                     }
+                    refreshCacheSize()
                 }
             })
         }, MoreExecutors.directExecutor())
@@ -457,21 +473,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             val contextSongs = if (albumSongs.isNotEmpty()) albumSongs else _songs.value
+            _activeContextSongs.value = contextSongs
             val startIndex = contextSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
             
             val mediaItems = contextSongs.map { s ->
-                val mediaMetadata = androidx.media3.common.MediaMetadata.Builder()
-                    .setTitle(s.title)
-                    .setArtist(s.artist)
-                    .setAlbumTitle(s.album)
-                    .setArtworkUri(android.net.Uri.parse(s.albumArtUri ?: ""))
-                    .build()
-
-                MediaItem.Builder()
-                    .setMediaId(s.id)
-                    .setUri(s.path)
-                    .setMediaMetadata(mediaMetadata)
-                    .build()
+                PreloadManager.buildMediaItem(s)
             }
 
             performManualTrackChange {
@@ -482,7 +488,30 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 viewModelScope.launch {
                     repository.incrementPlayCount(song.id)
                 }
+                triggerNextSongPreload(song, contextSongs)
             }
+        }
+    }
+
+    private fun triggerNextSongPreload(current: Song, contextSongs: List<Song> = _activeContextSongs.value) {
+        val list = if (contextSongs.isNotEmpty()) contextSongs else _songs.value
+        val currentIndex = list.indexOfFirst { it.id == current.id }
+        if (currentIndex != -1 && currentIndex + 1 < list.size) {
+            val nextSong = list[currentIndex + 1]
+            preloadManager.prebufferNextSong(nextSong)
+        }
+    }
+
+    fun refreshCacheSize() {
+        viewModelScope.launch {
+            _cacheSizeMb.value = CacheManager.getCacheSizeMb(getApplication())
+        }
+    }
+
+    fun clearAudioCache() {
+        viewModelScope.launch {
+            CacheManager.clearCache(getApplication())
+            refreshCacheSize()
         }
     }
 

@@ -1099,6 +1099,8 @@ fun PlayerScreen(
     val isShuffleMode by musicViewModel.isShuffleMode.collectAsState()
     val repeatMode by musicViewModel.repeatMode.collectAsState()
     val isCrossfading by musicViewModel.isCrossfading.collectAsState()
+    val isPrebuffering by musicViewModel.isPrebuffering.collectAsState()
+    val prebufferedSongId by musicViewModel.prebufferedSongId.collectAsState()
     val crossfadeEnabled by musicViewModel.crossfadeEnabled.collectAsState()
     val crossfadeDuration by musicViewModel.crossfadeDuration.collectAsState()
     
@@ -1413,34 +1415,68 @@ fun PlayerScreen(
                         modifier = Modifier.weight(1f, fill = false)
                     )
 
-                    AnimatedVisibility(
-                        visible = isCrossfading,
-                        enter = fadeIn() + scaleIn(),
-                        exit = fadeOut() + scaleOut()
-                    ) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.tertiaryContainer,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .padding(start = 8.dp)
-                                .testTag("player_crossfading_badge")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AnimatedVisibility(
+                            visible = isPrebuffering,
+                            enter = fadeIn() + scaleIn(),
+                            exit = fadeOut() + scaleOut()
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .padding(start = 6.dp)
+                                    .testTag("player_prebuffering_badge")
                             ) {
-                                Icon(
-                                    Icons.Rounded.GraphicEq,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(12.dp),
-                                    tint = MaterialTheme.colorScheme.onTertiaryContainer
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    "Crossfade",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = MaterialTheme.colorScheme.onTertiaryContainer
-                                )
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.CloudDownload,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(12.dp),
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        "Pre-buffering",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                            }
+                        }
+
+                        AnimatedVisibility(
+                            visible = isCrossfading,
+                            enter = fadeIn() + scaleIn(),
+                            exit = fadeOut() + scaleOut()
+                        ) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.tertiaryContainer,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .padding(start = 6.dp)
+                                    .testTag("player_crossfading_badge")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.GraphicEq,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(12.dp),
+                                        tint = MaterialTheme.colorScheme.onTertiaryContainer
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        "Crossfade",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                                    )
+                                }
                             }
                         }
                     }
@@ -3066,6 +3102,75 @@ fun SettingsScreen(
                         }
                     }
                 }
+
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+
+                val cacheSizeMb by musicViewModel.cacheSizeMb.collectAsState()
+                LaunchedEffect(Unit) {
+                    musicViewModel.refreshCacheSize()
+                }
+
+                SettingsItem(
+                    title = "البث المتقطع الذكي (Smart Streaming)",
+                    subtitle = "تشغيل فوري عبر HLS / DASH دون انتظار تحميل كامل الملف",
+                    icon = Icons.Rounded.Stream,
+                    iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    iconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    trailing = {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                "نشط (Active)",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+
+                SettingsItem(
+                    title = "التحميل المسبق التلقائي (Pre-buffering)",
+                    subtitle = "تنزيل مقدمة الأغنية التالية في الخلفية قبل انتهاء الحالية لمنع التوقف",
+                    icon = Icons.Rounded.CloudDownload,
+                    iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    iconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    trailing = {
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                "تلقائي (Auto)",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                )
+
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+
+                SettingsItem(
+                    title = "التخزين المؤقت المحلي (Media Cache)",
+                    subtitle = "المساحة المستهلكة: ${cacheSizeMb} MB (يقلل استهلاك البيانات ويسرع التشغيل)",
+                    icon = Icons.Rounded.Storage,
+                    iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    iconColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                    trailing = {
+                        TextButton(
+                            onClick = { musicViewModel.clearAudioCache() },
+                            modifier = Modifier.testTag("clear_cache_button")
+                        ) {
+                            Text("تفريغ المؤقت", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                )
             }
         }
 
