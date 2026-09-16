@@ -48,3 +48,27 @@ data class PlaylistSong(
     val playlistId: Long,
     val songId: String
 )
+
+data class HistorySongItem(
+    val id: String,
+    val title: String,
+    val artist: String,
+    val album: String,
+    val duration: Long,
+    val path: String,
+    val albumArtUri: String?,
+    val folderPath: String = "",
+    val playCount: Int = 0,
+    val lastPlayed: Long = 0L
+) {
+    fun toSong(): Song = Song(
+        id = id,
+        title = title,
+        artist = artist,
+        album = album,
+        duration = duration,
+        path = path,
+        albumArtUri = albumArtUri,
+        folderPath = folderPath
+    )
+}

@@ -692,8 +692,9 @@ fun LiquidGlassNavBar(
 
     val tabs = listOf(
         LiquidNavTabItem(0, "Library", Icons.Rounded.LibraryMusic, Icons.Outlined.LibraryMusic),
-        LiquidNavTabItem(1, "Folders", Icons.Rounded.Folder, Icons.Outlined.Folder),
-        LiquidNavTabItem(2, "Settings", Icons.Rounded.Settings, Icons.Outlined.Settings)
+        LiquidNavTabItem(1, "History", Icons.Rounded.History, Icons.Default.History),
+        LiquidNavTabItem(2, "Folders", Icons.Rounded.Folder, Icons.Outlined.Folder),
+        LiquidNavTabItem(3, "Settings", Icons.Rounded.Settings, Icons.Outlined.Settings)
     )
 
     Box(

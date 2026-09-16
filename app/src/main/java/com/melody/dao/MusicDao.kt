@@ -46,4 +46,22 @@ interface MusicDao {
     @RewriteQueriesToDropUnusedColumns
     @Query("SELECT * FROM songs JOIN playlist_songs ON songs.id = playlist_songs.songId WHERE playlistId = :playlistId")
     fun getSongsInPlaylist(playlistId: Long): Flow<List<Song>>
+
+    @Query("""
+        SELECT songs.id, songs.title, songs.artist, songs.album, songs.duration, 
+               songs.path, songs.albumArtUri, songs.folderPath,
+               song_usage.playCount, song_usage.lastPlayed 
+        FROM songs 
+        INNER JOIN song_usage ON songs.id = song_usage.songId 
+        WHERE song_usage.lastPlayed > 0 
+        ORDER BY song_usage.lastPlayed DESC
+    """)
+    fun getPlaybackHistory(): Flow<List<HistorySongItem>>
+
+    @Query("DELETE FROM song_usage")
+    suspend fun clearHistory()
+
+    @Query("DELETE FROM song_usage WHERE songId = :songId")
+    suspend fun removeSongFromHistory(songId: String)
 }
+

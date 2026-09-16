@@ -46,6 +46,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val playlists = repository.playlists
+    val playbackHistory: StateFlow<List<com.melody.data.HistorySongItem>> = repository.playbackHistory
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
@@ -55,6 +57,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying
+
+    private val _isShuffleMode = MutableStateFlow(false)
+    val isShuffleMode: StateFlow<Boolean> = _isShuffleMode
+
+    private val _repeatMode = MutableStateFlow(Player.REPEAT_MODE_OFF)
+    val repeatMode: StateFlow<Int> = _repeatMode
 
     private val _playbackProgress = MutableStateFlow(0L)
     val playbackProgress: StateFlow<Long> = _playbackProgress
@@ -66,6 +74,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val dominantColor: StateFlow<androidx.compose.ui.graphics.Color> = _dominantColor
     
     val audioAmplitude: StateFlow<Float> = PlaybackService.amplitude
+
+    private var progressJob: kotlinx.coroutines.Job? = null
 
     data class BluetoothDeviceRecord(
         val name: String,
@@ -212,14 +222,26 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun startProgressUpdate() {
-        viewModelScope.launch {
-            while (true) {
-                mediaController?.let {
-                    _playbackProgress.value = it.currentPosition
-                    _currentDuration.value = it.duration.coerceAtLeast(0L)
+        updateProgressPolling(_isPlaying.value)
+    }
+
+    private fun updateProgressPolling(isPlaying: Boolean) {
+        progressJob?.cancel()
+        syncPlaybackProgress()
+        if (isPlaying) {
+            progressJob = viewModelScope.launch {
+                while (true) {
+                    syncPlaybackProgress()
+                    kotlinx.coroutines.delay(250)
                 }
-                kotlinx.coroutines.delay(300)
             }
+        }
+    }
+
+    private fun syncPlaybackProgress() {
+        mediaController?.let {
+            _playbackProgress.value = it.currentPosition
+            _currentDuration.value = it.duration.coerceAtLeast(0L)
         }
     }
 
@@ -232,13 +254,35 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         controllerFuture = MediaController.Builder(getApplication(), sessionToken).buildAsync()
         controllerFuture?.addListener({
             mediaController = controllerFuture?.get()
+            mediaController?.let { controller ->
+                _isPlaying.value = controller.isPlaying
+                _isShuffleMode.value = controller.shuffleModeEnabled
+                _repeatMode.value = controller.repeatMode
+                updateProgressPolling(controller.isPlaying)
+            }
             mediaController?.addListener(object : Player.Listener {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     _isPlaying.value = isPlaying
+                    updateProgressPolling(isPlaying)
+                }
+
+                override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+                    _isShuffleMode.value = shuffleModeEnabled
+                }
+
+                override fun onRepeatModeChanged(repeatMode: Int) {
+                    _repeatMode.value = repeatMode
                 }
 
                 override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                    _currentSong.value = _songs.value.find { it.id == mediaItem?.mediaId }
+                    val found = _songs.value.find { it.id == mediaItem?.mediaId }
+                    _currentSong.value = found
+                    syncPlaybackProgress()
+                    if (found != null) {
+                        viewModelScope.launch {
+                            repository.incrementPlayCount(found.id)
+                        }
+                    }
                 }
             })
         }, MoreExecutors.directExecutor())
@@ -352,6 +396,26 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun toggleShuffleMode() {
+        mediaController?.let { controller ->
+            val nextState = !controller.shuffleModeEnabled
+            controller.shuffleModeEnabled = nextState
+            _isShuffleMode.value = nextState
+        }
+    }
+
+    fun toggleRepeatMode() {
+        mediaController?.let { controller ->
+            val nextMode = when (controller.repeatMode) {
+                Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+                Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+                else -> Player.REPEAT_MODE_OFF
+            }
+            controller.repeatMode = nextMode
+            _repeatMode.value = nextMode
+        }
+    }
+
     fun seekTo(position: Long) {
         mediaController?.seekTo(position)
     }
@@ -362,6 +426,26 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun playPrevious() {
         mediaController?.seekToPrevious()
+    }
+
+    fun clearHistory() {
+        viewModelScope.launch {
+            repository.clearHistory()
+        }
+    }
+
+    fun removeSongFromHistory(songId: String) {
+        viewModelScope.launch {
+            repository.removeSongFromHistory(songId)
+        }
+    }
+
+    fun playAllHistory(shuffle: Boolean = false) {
+        val historyList = playbackHistory.value.map { it.toSong() }
+        if (historyList.isNotEmpty()) {
+            val listToPlay = if (shuffle) historyList.shuffled() else historyList
+            playSong(listToPlay.first(), listToPlay)
+        }
     }
 
     fun createPlaylist(name: String) {
@@ -386,6 +470,70 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setDominantColor(color: androidx.compose.ui.graphics.Color) {
         _dominantColor.value = color
+    }
+
+    // Equalizer & Audio Processing State
+    private val _equalizerEnabled = MutableStateFlow(true)
+    val equalizerEnabled: StateFlow<Boolean> = _equalizerEnabled
+
+    private val _equalizerPresetIndex = MutableStateFlow(0)
+    val equalizerPresetIndex: StateFlow<Int> = _equalizerPresetIndex
+
+    // 5 Frequency Bands in dB (-12 dB to +12 dB) : 60Hz, 230Hz, 910Hz, 3.6kHz, 14kHz
+    private val _bandLevels = MutableStateFlow(listOf(0f, 0f, 0f, 0f, 0f))
+    val bandLevels: StateFlow<List<Float>> = _bandLevels
+
+    private val _bassBoostLevel = MutableStateFlow(0.3f)
+    val bassBoostLevel: StateFlow<Float> = _bassBoostLevel
+
+    private val _virtualizerLevel = MutableStateFlow(0.2f)
+    val virtualizerLevel: StateFlow<Float> = _virtualizerLevel
+
+    fun setEqualizerEnabled(enabled: Boolean) {
+        _equalizerEnabled.value = enabled
+        PlaybackService.equalizerEnabled = enabled
+    }
+
+    fun setBandLevel(bandIndex: Int, levelDb: Float) {
+        if (bandIndex in 0..4) {
+            val updated = _bandLevels.value.toMutableList()
+            updated[bandIndex] = levelDb.coerceIn(-12f, 12f)
+            _bandLevels.value = updated
+            PlaybackService.bandLevels = updated.toFloatArray()
+        }
+    }
+
+    fun setEqualizerPreset(presetIndex: Int, bands: List<Float>, bass: Float, virtualizer: Float) {
+        _equalizerPresetIndex.value = presetIndex
+        _bandLevels.value = bands
+        _bassBoostLevel.value = bass
+        _virtualizerLevel.value = virtualizer
+        PlaybackService.bandLevels = bands.toFloatArray()
+        PlaybackService.bassBoostStrength = bass
+        PlaybackService.virtualizerStrength = virtualizer
+    }
+
+    fun setBassBoost(level: Float) {
+        val clamped = level.coerceIn(0f, 1f)
+        _bassBoostLevel.value = clamped
+        PlaybackService.bassBoostStrength = clamped
+    }
+
+    fun setVirtualizer(level: Float) {
+        val clamped = level.coerceIn(0f, 1f)
+        _virtualizerLevel.value = clamped
+        PlaybackService.virtualizerStrength = clamped
+    }
+
+    fun resetEqualizer() {
+        val flat = listOf(0f, 0f, 0f, 0f, 0f)
+        _equalizerPresetIndex.value = 0 // Flat
+        _bandLevels.value = flat
+        _bassBoostLevel.value = 0f
+        _virtualizerLevel.value = 0f
+        PlaybackService.bandLevels = flat.toFloatArray()
+        PlaybackService.bassBoostStrength = 0f
+        PlaybackService.virtualizerStrength = 0f
     }
 
     override fun onCleared() {

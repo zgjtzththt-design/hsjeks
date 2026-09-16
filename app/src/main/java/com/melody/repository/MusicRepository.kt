@@ -7,9 +7,18 @@ import kotlinx.coroutines.flow.Flow
 class MusicRepository(private val musicDao: MusicDao) {
     val mostPlayedSongs: Flow<List<SongUsage>> = musicDao.getMostPlayedSongs()
     val playlists: Flow<List<Playlist>> = musicDao.getAllPlaylists()
+    val playbackHistory: Flow<List<HistorySongItem>> = musicDao.getPlaybackHistory()
 
     suspend fun incrementPlayCount(songId: String) {
         musicDao.incrementPlayCount(songId)
+    }
+
+    suspend fun clearHistory() {
+        musicDao.clearHistory()
+    }
+
+    suspend fun removeSongFromHistory(songId: String) {
+        musicDao.removeSongFromHistory(songId)
     }
 
     suspend fun createPlaylist(name: String): Long {
